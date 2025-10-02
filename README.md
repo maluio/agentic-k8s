@@ -65,3 +65,26 @@ Customize behavior with environment variables:
 - `KUBECONFIG` to point at a non-default kubeconfig before the verification step
 
 If connectivity fails, confirm the local K3s cluster is running (`sudo systemctl status k3s`) and that your kubeconfig points to the right endpoint.
+
+### Install Helm
+
+Install the Helm CLI so you can package and deploy charts to the local Kubernetes cluster.
+
+**Prerequisites**
+- `curl` and `tar`
+- Write access to the target install directory (default requires `sudo`)
+
+**Install / Upgrade**
+
+```bash
+sudo ./scripts/install-helm.sh
+```
+
+The script downloads the pinned Helm release (`v3.15.2` by default), puts the binary under `/usr/local/bin`, and verifies the reported version matches the expected release.
+
+Customize via environment variables:
+
+- `HELM_VERSION` (e.g., `v3.14.4`) to install a different release
+- `HELM_INSTALL_DIR` to install Helm into an alternate writable directory without sudo
+
+If you see version mismatches, ensure the requested version exists on [get.helm.sh](https://get.helm.sh/) and that your PATH does not resolve to a different Helm binary.

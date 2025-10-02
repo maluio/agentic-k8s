@@ -88,3 +88,22 @@ Customize via environment variables:
 - `HELM_INSTALL_DIR` to install Helm into an alternate writable directory without sudo
 
 If you see version mismatches, ensure the requested version exists on [get.helm.sh](https://get.helm.sh/) and that your PATH does not resolve to a different Helm binary.
+
+### Deploy the NGINX Example Chart
+
+With the local cluster and tooling ready, install the sample chart located in `charts/nginx-example`:
+
+```bash
+helm install nginx-example charts/nginx-example
+```
+
+Verify the release and expose it locally:
+
+```bash
+kubectl get pods -l app.kubernetes.io/instance=nginx-example
+kubectl get svc nginx-example
+kubectl port-forward svc/nginx-example 8080:80
+# open http://127.0.0.1:8080/
+```
+
+See `charts/nginx-example/README.md` for configuration options and uninstall instructions.

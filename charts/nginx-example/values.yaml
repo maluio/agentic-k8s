@@ -1,0 +1,30 @@
+# Default values for nginx-example.
+# Tweak these to customize the deployment.
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Leave blank to use the chart appVersion
+  tag: ""
+
+containerPort: 80
+
+service:
+  type: ClusterIP
+  port: 80
+
+podLabels: {}
+
+resources: {}
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http

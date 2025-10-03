@@ -24,3 +24,28 @@ persistence:
   enabled: true
   size: 1Gi
   storageClass: ""
+
+dashboard:
+  port: 8080
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.27.0-alpine
+    pullPolicy: IfNotPresent
+  title: Agentic Kubernetes Lab
+  description: Quick links to the services exposed by the bootstrap script.
+  links:
+    - name: Gitea
+      url: http://gitea-http.gitea.svc.cluster.local:3000/
+      description: Git hosting (agentadmin / agentadmin123!)
+    - name: Argo CD UI
+      url: http://argocd-server.argocd.svc.cluster.local/
+      description: Continuous delivery dashboard (HTTP)
+    - name: Argo CD gRPC
+      url: https://argocd-server.argocd.svc.cluster.local:443/
+      description: Argo CD gRPC endpoint (TLS)
+    - name: NGINX Example
+      url: http://nginx-example.default.svc.cluster.local/
+      description: Sample workload exposed by bootstrap
+    - name: Firefox UI
+      url: http://localhost:5800/
+      description: Remote Firefox session (noVNC)

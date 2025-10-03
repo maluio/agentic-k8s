@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "firefox.fullname" . }}-dashboard
+  labels:
+    {{- include "firefox.labels" . | nindent 4 }}
+data:
+  index.html: |-
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>{{ .Values.dashboard.title }}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+          body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0 auto; padding: 2rem; max-width: 800px; background-color: #f5f7fa; color: #1f2933; }
+          h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+          p { margin: 0 0 1.5rem 0; }
+          ul { list-style: none; padding: 0; }
+          li { background: #ffffff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
+          a { color: #1d4ed8; font-weight: 600; text-decoration: none; word-break: break-word; }
+          a:hover { text-decoration: underline; }
+          .desc { margin-top: 0.25rem; color: #52606d; }
+        </style>
+      </head>
+      <body>
+        <h1>{{ .Values.dashboard.title }}</h1>
+        <p>{{ .Values.dashboard.description }}</p>
+        <ul>
+          {{- range .Values.dashboard.links }}
+          <li>
+            <a href="{{ .url }}" target="_blank" rel="noopener noreferrer">{{ .name }}</a>
+            {{- if .description }}
+            <div class="desc">{{ .description }}</div>
+            {{- end }}
+          </li>
+          {{- end }}
+        </ul>
+      </body>
+    </html>

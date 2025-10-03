@@ -102,8 +102,24 @@ Verify the release and expose it locally:
 ```bash
 kubectl get pods -l app.kubernetes.io/instance=nginx-example
 kubectl get svc nginx-example
-kubectl port-forward svc/nginx-example 8080:80
-# open http://127.0.0.1:8080/
+kubectl port-forward svc/nginx-example 8081:80
+# open http://127.0.0.1:8081/
 ```
 
 See `charts/nginx-example/README.md` for configuration options and uninstall instructions.
+
+### One-Shot Bootstrap
+
+To provision a fresh developer environment—including K3s, kubectl, Helm, the vendored charts, Argo CD applications, and the standard port-forwards—run the bundled bootstrap script from the repo root:
+
+```bash
+./scripts/bootstrap.sh
+```
+
+The script is idempotent: rerunning it will skip components that are already installed, redeploy Helm releases as needed, ensure Argo CD is configured, and restart any missing port-forwards. A summary is printed at the end listing what was installed or reused along with:
+
+- Gitea URL (`http://127.0.0.1:8090/`) and seeded credentials (`agentadmin / agentadmin123!`)
+- Argo CD UI (`http://127.0.0.1:8093/`), gRPC endpoint (`https://127.0.0.1:8083/`), and the current admin password sourced from the cluster secret
+- NGINX example ingress via `http://127.0.0.1:8081/`
+
+Port-forward logs are written to `${TMPDIR:-/tmp}/agentic-k8s`. Because the bootstrap touches K3s, you may be prompted for `sudo` privileges during the first run.

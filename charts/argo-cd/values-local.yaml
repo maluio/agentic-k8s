@@ -1,0 +1,21 @@
+server:
+  service:
+    type: ClusterIP
+    ports:
+      http: 80
+      https: 443
+  ingress:
+    enabled: false
+configs:
+  params:
+    server.insecure: "true"
+  cm: {}
+
+repoServer:
+  service:
+    type: ClusterIP
+
+applicationSet:
+  enabled: true
+notifications:
+  enabled: true

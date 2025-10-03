@@ -49,3 +49,4 @@ dashboard:
     - name: Firefox UI
       url: http://localhost:5800/
       description: Remote Firefox session (noVNC)
+  argoCdPassword: ""

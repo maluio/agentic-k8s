@@ -21,6 +21,13 @@ data:
           a { color: #1d4ed8; font-weight: 600; text-decoration: none; word-break: break-word; }
           a:hover { text-decoration: underline; }
           .desc { margin-top: 0.25rem; color: #52606d; }
+          .credentials { margin-top: 2rem; padding: 1rem 1.25rem; border: 1px solid #c4d1e1; border-radius: 8px; background: #eef2ff; color: #243b53; }
+          .credentials-header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+          .copy-btn { border: 1px solid #4c6ef5; background: #3b82f6; color: #fff; font-weight: 600; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; transition: background 0.15s ease; }
+          .copy-btn:hover { background: #2563eb; }
+          .copy-btn:active { transform: translateY(1px); }
+          .copy-result { margin-top: 0.5rem; color: #2d6a4f; font-size: 0.9rem; min-height: 1rem; }
+          code { font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #dce5ff; padding: 0.2rem 0.4rem; border-radius: 4px; }
         </style>
       </head>
       <body>
@@ -36,5 +43,69 @@ data:
           </li>
           {{- end }}
         </ul>
+        {{- if .Values.dashboard.argoCdPassword }}
+        <div class="credentials">
+          <div class="credentials-header">
+            <strong>Argo CD Admin Password:</strong>
+            <code id="argo-password">{{ .Values.dashboard.argoCdPassword }}</code>
+            <button type="button" class="copy-btn" id="copy-argo-password" aria-label="Copy Argo CD admin password">Copy</button>
+          </div>
+          <div class="copy-result" id="copy-argo-result" aria-live="polite"></div>
+          <div class="desc">Rotate this password with <code>kubectl -n argocd delete secret argocd-initial-admin-secret</code>; the bootstrap script and dashboard will surface the regenerated value on rerun.</div>
+        </div>
+        {{- end }}
+        <script>
+          (function () {
+            const copyBtn = document.getElementById('copy-argo-password');
+            const passwordEl = document.getElementById('argo-password');
+            const statusEl = document.getElementById('copy-argo-result');
+
+            if (!copyBtn || !passwordEl || !statusEl) {
+              return;
+            }
+
+            const password = passwordEl.textContent.trim();
+            if (!password) {
+              copyBtn.setAttribute('disabled', 'disabled');
+              return;
+            }
+
+            const showStatus = (message, success) => {
+              statusEl.textContent = message;
+              statusEl.style.color = success ? '#2d6a4f' : '#b91c1c';
+              if (success) {
+                setTimeout(() => {
+                  statusEl.textContent = '';
+                }, 2000);
+              }
+            };
+
+            copyBtn.addEventListener('click', async () => {
+              const textToCopy = passwordEl.textContent.trim();
+              try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  await navigator.clipboard.writeText(textToCopy);
+                } else {
+                  const textarea = document.createElement('textarea');
+                  textarea.value = textToCopy;
+                  textarea.style.position = 'fixed';
+                  textarea.style.opacity = '0';
+                  document.body.appendChild(textarea);
+                  textarea.focus();
+                  textarea.select();
+                  const ok = document.execCommand('copy');
+                  document.body.removeChild(textarea);
+                  if (!ok) {
+                    throw new Error('execCommand failed');
+                  }
+                }
+                showStatus('Copied password to clipboard.', true);
+              } catch (error) {
+                console.error('Password copy failed', error);
+                showStatus('Copy failed. Please copy manually.', false);
+              }
+            });
+          })();
+        </script>
       </body>
     </html>

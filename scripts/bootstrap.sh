@@ -292,14 +292,6 @@ main() {
   wait_for_deployment argocd argocd-repo-server
   wait_for_statefulset argocd argocd-application-controller || true
 
-  helm_upgrade firefox charts/firefox tools
-  wait_for_deployment tools firefox
-  ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log"
-
-  kubectl apply -f argocd >/dev/null
-  wait_for_application gitea || true
-  wait_for_application nginx-example || true
-
   local argocd_password
   argocd_password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
   if [[ -n "$argocd_password" ]]; then
@@ -308,6 +300,18 @@ main() {
     argocd_password="<unknown>"
     log "WARNING: Unable to read Argo CD admin password"
   fi
+
+  if [[ "$argocd_password" == "<unknown>" ]]; then
+    helm_upgrade firefox charts/firefox tools
+  else
+    helm_upgrade firefox charts/firefox tools --set-string dashboard.argoCdPassword="$argocd_password"
+  fi
+  wait_for_deployment tools firefox
+  ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log"
+
+  kubectl apply -f argocd >/dev/null
+  wait_for_application gitea || true
+  wait_for_application nginx-example || true
 
   printf '\nBootstrap summary:\n'
   for entry in "${SUMMARY[@]}"; do

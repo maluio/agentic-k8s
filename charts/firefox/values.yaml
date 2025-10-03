@@ -1,0 +1,26 @@
+replicaCount: 1
+
+image:
+  repository: jlesage/firefox
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5800
+
+resources: {}
+
+podLabels: {}
+
+env:
+  VNC_PASSWORD: firefox
+  DISPLAY_WIDTH: "1280"
+  DISPLAY_HEIGHT: "720"
+  SECURE_CONNECTION: "0"
+  KEEP_APP_RUNNING: "1"
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""

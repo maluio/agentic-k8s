@@ -18,6 +18,7 @@ ARGO_HTTP_PORT_FORWARD_CMD="kubectl port-forward -n argocd svc/argocd-server 809
 ARGO_TLS_PORT_FORWARD_CMD="kubectl port-forward -n argocd svc/argocd-server 8083:443 --address 0.0.0.0"
 NGINX_PORT_FORWARD_CMD="kubectl port-forward -n default svc/nginx-example 8081:80 --address 0.0.0.0"
 ZELLIJ_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/zellij 5555:5555 --address 0.0.0.0"
+FIREFOX_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/firefox 5801:5800 --address 0.0.0.0"
 
 log() {
   printf '[bootstrap] %s\n' "$1"
@@ -183,11 +184,11 @@ ensure_repo_secret() {
   if kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd >/dev/null 2>&1; then
     existing_token=$(kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd -o jsonpath='{.data.password}' | base64 -d)
     if curl -sf -H "Authorization: token $existing_token" http://127.0.0.1:8090/api/v1/user >/dev/null 2>&1; then
-      log "Reusing existing Argo CD repository secret"
+      printf '[bootstrap] %s\n' "Reusing existing Argo CD repository secret" >&2
       printf '%s' "$existing_token"
       return 0
     else
-      log "Existing Argo CD repository token invalid; generating a new one"
+      printf '[bootstrap] %s\n' "Existing Argo CD repository token invalid; generating a new one" >&2
     fi
   fi
 
@@ -196,12 +197,12 @@ ensure_repo_secret() {
   token_name="bootstrap-$(date +%s)"
   output=$(kubectl exec -n gitea -c gitea "$pod" -- gitea admin user generate-access-token --username "$GITEA_USER" --token-name "$token_name" 2>&1)
   if [[ $? -ne 0 ]]; then
-    log "ERROR: Unable to create Gitea token. Output: $output"
+    printf '[bootstrap] ERROR: %s\n' "Unable to create Gitea token. Output: $output" >&2
     exit 1
   fi
   token=$(echo "$output" | awk -F': ' 'NF>1 {print $2}' | tr -d '\r\n')
   if [[ -z "$token" ]]; then
-    log "ERROR: Could not parse Gitea token output: $output"
+    printf '[bootstrap] ERROR: %s\n' "Could not parse Gitea token output: $output" >&2
     exit 1
   fi
 
@@ -293,6 +294,9 @@ main() {
   helm_upgrade zellij charts/zellij tools
   wait_for_deployment tools zellij
   ensure_port_forward "Zellij" "kubectl port-forward.*svc/zellij.*5555:5555" "$ZELLIJ_PORT_FORWARD_CMD" "$LOG_DIR/zellij-port-forward.log"
+  helm_upgrade firefox charts/firefox tools
+  wait_for_deployment tools firefox
+  ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log"
 
   kubectl apply -f argocd >/dev/null
   wait_for_application gitea || true
@@ -319,6 +323,7 @@ main() {
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
   printf ' - NGINX example: http://127.0.0.1:8081/\n'
   printf ' - Zellij (web): http://127.0.0.1:5555/\n'
+  printf ' - Firefox (web): http://127.0.0.1:5801/ (password firefox)\n'
   printf '\nPort-forward logs: %s\n' "$LOG_DIR"
 }
 

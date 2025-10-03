@@ -1,0 +1,6 @@
+apiVersion: v2
+name: firefox
+version: 0.1.0
+appVersion: "latest"
+description: Web-accessible Firefox (jlesage) for interacting with local services
+type: application

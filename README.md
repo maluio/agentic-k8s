@@ -32,7 +32,7 @@ That’s the entirety of the workflow—clone the repo, run `./scripts/bootstrap
 
 ### Firefox landing page
 
-The Firefox chart now ships with a sidecar that serves a lightweight HTML dashboard listing the endpoints the bootstrap process exposes (Gitea, Argo CD HTTP/gRPC, nginx example, Firefox, and any additional links you add). The default entries use in-cluster service hostnames so the remote Firefox session can reach them without port-forwards. The Firefox container is configured with `FF_OPEN_URL` so each browser session opens the dashboard first.
+The Firefox chart now ships with a sidecar that serves a lightweight HTML dashboard listing the endpoints the bootstrap process exposes (Gitea, Argo CD HTTP/gRPC, nginx example, Firefox, and any additional links you add). The default entries use in-cluster service hostnames so the remote Firefox session can reach them without port-forwards, and the Argo CD tile includes the admin login hint plus the command to retrieve the current password. The Firefox container is configured with `FF_OPEN_URL` so each browser session opens the dashboard first.
 
 To customize the page, supply your own values file when installing or updating the chart and override the `dashboard.links` array (each item supports `name`, `url`, and `description`). Use cluster DNS names for services you plan to open from the remote browser, or swap to port-forwarded URLs if you prefer to open them locally. You can also tweak the title, description text, and the sidecar image/port through the `dashboard` block. Example:
 

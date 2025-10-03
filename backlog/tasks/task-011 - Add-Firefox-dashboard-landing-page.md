@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2025-10-03 11:51'
-updated_date: '2025-10-03 12:04'
+updated_date: '2025-10-03 12:12'
 labels: []
 dependencies: []
 ---
@@ -40,4 +40,6 @@ Add a sidecar container to the Firefox Helm deployment that serves a simple stat
 
 - Swapped dashboard URLs to use in-cluster service DNS names for compatibility with the remote Firefox session.
 - Clarified README guidance about customizing links for internal versus port-forwarded access.
+
+- Added Argo CD credential hint to the dashboard and documentation so users know how to retrieve the current admin password.
 <!-- SECTION:NOTES:END -->

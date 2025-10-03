@@ -13,11 +13,7 @@ GITEA_EMAIL="agentadmin@example.com"
 GITEA_PASSWORD="agentadmin123!"
 GITEA_TOKEN_SECRET_NAME="repo-agentic-k8s"
 
-GITEA_PORT_FORWARD_CMD="kubectl port-forward -n gitea svc/gitea-http 8090:3000 --address 0.0.0.0"
-ARGO_HTTP_PORT_FORWARD_CMD="kubectl port-forward -n argocd svc/argocd-server 8093:80 --address 0.0.0.0"
-ARGO_TLS_PORT_FORWARD_CMD="kubectl port-forward -n argocd svc/argocd-server 8083:443 --address 0.0.0.0"
-NGINX_PORT_FORWARD_CMD="kubectl port-forward -n default svc/nginx-example 8081:80 --address 0.0.0.0"
-FIREFOX_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/firefox 5801:5800 --address 0.0.0.0"
+FIREFOX_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/firefox 5801:5800 --address 127.0.0.1"
 
 log() {
   printf '[bootstrap] %s\n' "$1"
@@ -161,20 +157,16 @@ wait_for_url() {
 }
 
 create_gitea_repo() {
-  local token=$1
-  local response
-  response=$(curl -s -o "$LOG_DIR/create_repo.json" -w "%{http_code}" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: token $token" \
-    -X POST http://127.0.0.1:8090/api/v1/user/repos \
-    -d '{"name":"agentic-k8s","private":false}')
-  if [[ "$response" == "201" ]]; then
+  local pod output
+  pod=$(get_gitea_pod)
+  if output=$(kubectl exec -n gitea -c gitea "$pod" -- \
+    gitea admin repo create --username "$GITEA_USER" --reponame agentic-k8s --private false 2>&1); then
     log "Created repository $GITEA_USER/agentic-k8s in Gitea"
     add_summary "Seeded Gitea repository"
-  elif [[ "$response" == "409" ]]; then
+  elif echo "$output" | grep -qi "already exists"; then
     log "Gitea repository already exists"
   else
-    log "WARNING: Failed to create Gitea repository (HTTP $response). Details: $LOG_DIR/create_repo.json"
+    log "WARNING: Failed to create Gitea repository. Output: $output"
   fi
 }
 
@@ -182,12 +174,9 @@ ensure_repo_secret() {
   local existing_token
   if kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd >/dev/null 2>&1; then
     existing_token=$(kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd -o jsonpath='{.data.password}' | base64 -d)
-    if curl -sf -H "Authorization: token $existing_token" http://127.0.0.1:8090/api/v1/user >/dev/null 2>&1; then
+    if [[ -n "$existing_token" ]]; then
       printf '[bootstrap] %s\n' "Reusing existing Argo CD repository secret" >&2
-      printf '%s' "$existing_token"
       return 0
-    else
-      printf '[bootstrap] %s\n' "Existing Argo CD repository token invalid; generating a new one" >&2
     fi
   fi
 
@@ -220,21 +209,41 @@ stringData:
   password: $token
 EOF
   add_summary "Created Argo CD repository secret"
-  printf '%s' "$token"
 }
 
 push_repository() {
-  local token=$1
-  local remote_url="http://$GITEA_USER:$token@127.0.0.1:8090/$GITEA_USER/agentic-k8s.git"
-  if git -C "$REPO_ROOT" remote get-url gitea >/dev/null 2>&1; then
-    git -C "$REPO_ROOT" remote set-url gitea "$remote_url"
-  else
-    git -C "$REPO_ROOT" remote add gitea "$remote_url"
+  local pod tmp_bundle
+  pod=$(get_gitea_pod)
+  tmp_bundle=$(mktemp "$LOG_DIR/agentic-k8s-XXXXXX.bundle")
+  if ! git -C "$REPO_ROOT" bundle create "$tmp_bundle" main >/dev/null 2>&1; then
+    log "WARNING: Failed to create git bundle for Gitea push"
+    rm -f "$tmp_bundle"
+    return
   fi
-  if git -C "$REPO_ROOT" push gitea main >/dev/null 2>&1; then
+
+  if ! kubectl exec -n gitea -c gitea "$pod" -- sh -c 'cat > /tmp/agentic-k8s.bundle' <"$tmp_bundle"; then
+    log "WARNING: Unable to stream repository bundle into the Gitea pod"
+    rm -f "$tmp_bundle"
+    return
+  fi
+
+  rm -f "$tmp_bundle"
+
+  if kubectl exec -n gitea -c gitea "$pod" -- env BOOTSTRAP_REPO_OWNER="$GITEA_USER" sh <<'EOF'
+set -euo pipefail
+rm -rf /tmp/bootstrap-agentic-k8s.git
+git clone --bare /tmp/agentic-k8s.bundle /tmp/bootstrap-agentic-k8s.git >/dev/null 2>&1
+repo_path="/data/git/gitea-repositories/${BOOTSTRAP_REPO_OWNER}/agentic-k8s.git"
+mkdir -p "$(dirname "$repo_path")"
+rm -rf "$repo_path"
+mv /tmp/bootstrap-agentic-k8s.git "$repo_path"
+chown -R git:git "$repo_path"
+rm -f /tmp/agentic-k8s.bundle
+EOF
+  then
     add_summary "Pushed repository to local Gitea"
   else
-    log "WARNING: Failed to push repository to Gitea"
+    log "WARNING: Failed to push repository into Gitea"
   fi
 }
 
@@ -270,26 +279,19 @@ main() {
 
   ensure_gitea_release
 
-  ensure_port_forward "Gitea" "kubectl port-forward.*gitea-http.*8090:3000" "$GITEA_PORT_FORWARD_CMD" "$LOG_DIR/gitea-port-forward.log"
-  wait_for_url http://127.0.0.1:8090/api/swagger.json "Gitea" || true
-
   local gitea_pod
   gitea_pod=$(get_gitea_pod)
   ensure_gitea_user "$gitea_pod"
 
-  local repo_token
-  repo_token=$(ensure_repo_secret)
-  create_gitea_repo "$repo_token"
-  push_repository "$repo_token"
+  ensure_repo_secret
+  create_gitea_repo
+  push_repository
 
   helm_upgrade argocd charts/argo-cd argocd -f charts/argo-cd/values-local.yaml
   wait_for_deployment argocd argocd-server
   wait_for_deployment argocd argocd-repo-server
   wait_for_statefulset argocd argocd-application-controller || true
 
-  ensure_port_forward "Argo CD HTTP" "kubectl port-forward.*argocd-server.*8093:80" "$ARGO_HTTP_PORT_FORWARD_CMD" "$LOG_DIR/argocd-http-port-forward.log"
-  ensure_port_forward "Argo CD TLS" "kubectl port-forward.*argocd-server.*8083:443" "$ARGO_TLS_PORT_FORWARD_CMD" "$LOG_DIR/argocd-tls-port-forward.log"
-  ensure_port_forward "NGINX example" "kubectl port-forward.*nginx-example.*8081:80" "$NGINX_PORT_FORWARD_CMD" "$LOG_DIR/nginx-port-forward.log"
   helm_upgrade firefox charts/firefox tools
   wait_for_deployment tools firefox
   ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log"
@@ -313,11 +315,11 @@ main() {
   done
 
   printf '\nAccess information:\n'
-  printf ' - Gitea UI:      http://127.0.0.1:8090/ (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
-  printf ' - Argo CD UI:    http://127.0.0.1:8093/\n'
-  printf ' - Argo CD gRPC:  https://127.0.0.1:8083/\n'
+  printf ' - Gitea UI:      Access via Firefox landing page (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
+  printf ' - Argo CD UI:    Access via Firefox landing page (admin user)\n'
+  printf ' - Argo CD gRPC:  In-cluster service argocd-server.argocd.svc.cluster.local:443\n'
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
-  printf ' - NGINX example: http://127.0.0.1:8081/\n'
+  printf ' - NGINX example: Available via nginx-example.default.svc.cluster.local\n'
   printf ' - Firefox (web): http://127.0.0.1:5801/ (password firefox)\n'
   printf '\nPort-forward logs: %s\n' "$LOG_DIR"
 }

@@ -8,15 +8,15 @@ Agentic Kubernetes lab experiments live here. The repository focuses on deliveri
 ./scripts/bootstrap.sh
 ```
 
-Running the script on a Linux host with `systemd` provisions everything this lab expects. The bootstrap is idempotent—reruns skip work that’s already complete, refresh Helm releases, and restart any missing port-forwards. You may be prompted for `sudo` to install K3s.
+Running the script on a Linux host with `systemd` provisions everything this lab expects. The bootstrap is idempotent—reruns skip work that’s already complete, refresh Helm releases, and restart the Firefox port-forward if needed. You may be prompted for `sudo` to install K3s.
 
 After the script completes it prints:
-- URLs and credentials for Gitea (`http://127.0.0.1:8090/`, `agentadmin / agentadmin123!`)
-- Argo CD access points (`http://127.0.0.1:8093/`, `https://127.0.0.1:8083/`) and the current admin password
-- Confirmation that the sample nginx deployment is reachable at `http://127.0.0.1:8081/`
+- Gitea credentials (`agentadmin / agentadmin123!`) for use via the Firefox landing page
+- Argo CD access details and the current admin password (reach it through the Firefox landing page or a manual port-forward if you prefer)
+- Confirmation that the sample nginx deployment is ready inside the cluster
 - A Firefox browser UI at `http://127.0.0.1:5801/` (password `firefox`) that opens a landing page of cluster links
 
-Port-forward logs are written to `${TMPDIR:-/tmp}/agentic-k8s` so you can inspect them if a tunnel drops (for example when coordinating with Tailscale Serve).
+Port-forward logs are written to `${TMPDIR:-/tmp}/agentic-k8s` so you can inspect them if the Firefox tunnel drops (for example when coordinating with Tailscale Serve).
 
 ## What Bootstrap Installs
 
@@ -26,7 +26,7 @@ Port-forward logs are written to `${TMPDIR:-/tmp}/agentic-k8s` so you can inspec
 - [Argo CD](https://argo-cd.readthedocs.io/) plus Applications that track the vendored charts
 - Sample `nginx-example` Helm chart deployment for quick smoke tests
 - Browser UI (Firefox via jlesage) for accessing cluster services, including a sidecar-served landing page of useful links
-- Standard port-forwards for Gitea (8090), Argo CD HTTP (8093) and gRPC (8083), the nginx service (8081), and Firefox (5801)
+- Firefox port-forward for the remote browser experience (other services are reachable via in-cluster DNS from that browser)
 
 That’s the entirety of the workflow—clone the repo, run `./scripts/bootstrap.sh`, and start building on the local cluster.
 

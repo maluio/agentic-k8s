@@ -17,7 +17,6 @@ GITEA_PORT_FORWARD_CMD="kubectl port-forward -n gitea svc/gitea-http 8090:3000 -
 ARGO_HTTP_PORT_FORWARD_CMD="kubectl port-forward -n argocd svc/argocd-server 8093:80 --address 0.0.0.0"
 ARGO_TLS_PORT_FORWARD_CMD="kubectl port-forward -n argocd svc/argocd-server 8083:443 --address 0.0.0.0"
 NGINX_PORT_FORWARD_CMD="kubectl port-forward -n default svc/nginx-example 8081:80 --address 0.0.0.0"
-ZELLIJ_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/zellij 5555:5555 --address 0.0.0.0"
 FIREFOX_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/firefox 5801:5800 --address 0.0.0.0"
 
 log() {
@@ -291,9 +290,6 @@ main() {
   ensure_port_forward "Argo CD HTTP" "kubectl port-forward.*argocd-server.*8093:80" "$ARGO_HTTP_PORT_FORWARD_CMD" "$LOG_DIR/argocd-http-port-forward.log"
   ensure_port_forward "Argo CD TLS" "kubectl port-forward.*argocd-server.*8083:443" "$ARGO_TLS_PORT_FORWARD_CMD" "$LOG_DIR/argocd-tls-port-forward.log"
   ensure_port_forward "NGINX example" "kubectl port-forward.*nginx-example.*8081:80" "$NGINX_PORT_FORWARD_CMD" "$LOG_DIR/nginx-port-forward.log"
-  helm_upgrade zellij charts/zellij tools
-  wait_for_deployment tools zellij
-  ensure_port_forward "Zellij" "kubectl port-forward.*svc/zellij.*5555:5555" "$ZELLIJ_PORT_FORWARD_CMD" "$LOG_DIR/zellij-port-forward.log"
   helm_upgrade firefox charts/firefox tools
   wait_for_deployment tools firefox
   ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log"
@@ -322,7 +318,6 @@ main() {
   printf ' - Argo CD gRPC:  https://127.0.0.1:8083/\n'
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
   printf ' - NGINX example: http://127.0.0.1:8081/\n'
-  printf ' - Zellij (web): http://127.0.0.1:5555/\n'
   printf ' - Firefox (web): http://127.0.0.1:5801/ (password firefox)\n'
   printf '\nPort-forward logs: %s\n' "$LOG_DIR"
 }

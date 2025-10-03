@@ -1,6 +1,0 @@
-apiVersion: v2
-name: zellij
-description: Self-contained Zellij server for shared terminal sessions
-version: 0.1.0
-appVersion: "0.41.2"
-type: application

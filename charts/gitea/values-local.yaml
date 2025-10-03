@@ -1,0 +1,16 @@
+valkey-cluster:
+  enabled: false
+
+valkey:
+  enabled: false
+
+postgresql-ha:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+gitea:
+  config:
+    database:
+      DB_TYPE: sqlite3

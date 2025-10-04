@@ -160,7 +160,7 @@ ensure_port_forward() {
     else
       if [[ -n "$port" ]] && command -v ss >/dev/null 2>&1; then
         local listener
-        listener=$(ss -tlnp 2>/dev/null | awk -v port="$port" '$4 ~ ("127.0.0.1:" port) { print $0 }')
+        listener=$(ss -tlnp 2>/dev/null | awk -v port="$port" 'index($4, ":" port) { print $0 }')
         if [[ -n "$listener" ]]; then
           log "WARNING: Failed to start $label port-forward; 127.0.0.1:$port already in use: $listener"
           return

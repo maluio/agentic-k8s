@@ -5,6 +5,7 @@ DEFAULT_VERSION="v3.15.2"
 DEFAULT_INSTALL_DIR="/usr/local/bin"
 HELM_BIN=""
 TMPDIR=""
+INSTALLED_PATH=""
 
 log() {
   printf '[install-helm] %s\n' "$1"
@@ -68,25 +69,60 @@ download_and_extract() {
   fi
 }
 
-install_binary() {
-  local install_dir target
-  install_dir=${HELM_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}
-  target="$install_dir/helm"
+install_with_permissions() {
+  local install_dir=$1
+  local use_sudo=${2:-false}
+  local target="$install_dir/helm"
 
-  if [[ ! -d "$install_dir" ]]; then
-    mkdir -p "$install_dir" || die "Failed to create install directory $install_dir"
+  if [[ "$use_sudo" == "true" ]]; then
+    if ! sudo mkdir -p "$install_dir"; then
+      return 1
+    fi
+    if ! sudo install -m 0755 "$HELM_BIN" "$target"; then
+      return 1
+    fi
+  else
+    if ! mkdir -p "$install_dir"; then
+      return 1
+    fi
+    if ! install -m 0755 "$HELM_BIN" "$target"; then
+      return 1
+    fi
   fi
 
-  if [[ ! -w "$install_dir" ]]; then
-    die "Install directory $install_dir is not writable. Re-run with sudo or set HELM_INSTALL_DIR to a writable path."
-  fi
-
-  install -m 0755 "$HELM_BIN" "$target"
   INSTALLED_PATH="$target"
-  log "Helm installed to $target"
+  return 0
+}
+
+install_binary() {
+  local install_dir fallback_dir
+  install_dir=${HELM_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}
+  fallback_dir="$HOME/.local/bin"
+
+  if install_with_permissions "$install_dir" false; then
+    log "Helm installed to $INSTALLED_PATH"
+  else
+    if command -v sudo >/dev/null 2>&1; then
+      log "Install directory $install_dir requires elevated permissions; retrying with sudo"
+      if install_with_permissions "$install_dir" true; then
+        log "Helm installed to $INSTALLED_PATH"
+      fi
+    fi
+
+    if [[ -z ${INSTALLED_PATH:-} ]]; then
+      log "Falling back to $fallback_dir for Helm installation"
+      if install_with_permissions "$fallback_dir" false; then
+        log "Helm installed to $INSTALLED_PATH"
+      fi
+    fi
+
+    if [[ -z ${INSTALLED_PATH:-} ]]; then
+      die "Failed to install Helm binary; try running with sudo or set HELM_INSTALL_DIR to a writable path."
+    fi
+  fi
 
   if ! command -v helm >/dev/null 2>&1; then
-    log "Warning: helm not found on PATH; ensure $install_dir is added to PATH."
+    log "Warning: helm not found on PATH; ensure $(dirname "$INSTALLED_PATH") is added to PATH."
   fi
 }
 

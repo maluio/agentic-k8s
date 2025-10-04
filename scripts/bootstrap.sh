@@ -121,22 +121,51 @@ ensure_gitea_user() {
   fi
 }
 
+port_forward_active() {
+  local match=$1
+  local port=${2:-}
+
+  if pgrep -f "$match" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [[ -n "$port" ]] && command -v ss >/dev/null 2>&1; then
+    if ss -tlnp 2>/dev/null | awk -v port="$port" '
+      $4 ~ ("127.0.0.1:" port) && $0 ~ /kubectl/ { found=1; exit }
+      END { exit found ? 0 : 1 }
+    '; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 ensure_port_forward() {
   local label=$1
   local match=$2
   local command=$3
   local logfile=$4
+  local port=${5:-}
 
-  if pgrep -f "$match" >/dev/null 2>&1; then
+  if port_forward_active "$match" "$port"; then
     log "$label port-forward already running"
     add_summary "$label port-forward active"
   else
     log "Starting $label port-forward"
     nohup bash -c "$command" >"$logfile" 2>&1 &
     sleep 1
-    if pgrep -f "$match" >/dev/null 2>&1; then
+    if port_forward_active "$match" "$port"; then
       add_summary "Started $label port-forward"
     else
+      if [[ -n "$port" ]] && command -v ss >/dev/null 2>&1; then
+        local listener
+        listener=$(ss -tlnp 2>/dev/null | awk -v port="$port" '$4 ~ ("127.0.0.1:" port) { print $0 }')
+        if [[ -n "$listener" ]]; then
+          log "WARNING: Failed to start $label port-forward; 127.0.0.1:$port already in use: $listener"
+          return
+        fi
+      fi
       log "WARNING: Failed to start $label port-forward (see $logfile)"
     fi
   fi
@@ -157,17 +186,31 @@ wait_for_url() {
 }
 
 create_gitea_repo() {
-  local pod output
+  local pod status
   pod=$(get_gitea_pod)
-  if output=$(kubectl exec -n gitea -c gitea "$pod" -- \
-    gitea admin repo create --username "$GITEA_USER" --reponame agentic-k8s --private false 2>&1); then
-    log "Created repository $GITEA_USER/agentic-k8s in Gitea"
-    add_summary "Seeded Gitea repository"
-  elif echo "$output" | grep -qi "already exists"; then
-    log "Gitea repository already exists"
-  else
-    log "WARNING: Failed to create Gitea repository. Output: $output"
+  status=$(kubectl exec -n gitea -c gitea "$pod" -- \
+    curl -sS -o /dev/null -w '%{http_code}' \
+      -u "$GITEA_USER:$GITEA_PASSWORD" \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"agentic-k8s","private":false,"default_branch":"main"}' \
+      http://127.0.0.1:3000/api/v1/user/repos 2>/dev/null || true)
+
+  if [[ -z "$status" ]]; then
+    status="000"
   fi
+
+  case "$status" in
+    201)
+      log "Created repository $GITEA_USER/agentic-k8s in Gitea"
+      add_summary "Seeded Gitea repository"
+      ;;
+    409)
+      log "Gitea repository already exists"
+      ;;
+    *)
+      log "WARNING: Failed to create Gitea repository via API (HTTP $status)"
+      ;;
+  esac
 }
 
 ensure_repo_secret() {
@@ -179,6 +222,8 @@ ensure_repo_secret() {
       return 0
     fi
   fi
+
+  kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
   local pod token_name output token
   pod=$(get_gitea_pod)
@@ -307,7 +352,7 @@ main() {
     helm_upgrade firefox charts/firefox tools --set-string dashboard.argoCdPassword="$argocd_password"
   fi
   wait_for_deployment tools firefox
-  ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log"
+  ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log" 5801
 
   kubectl apply -f argocd >/dev/null
   wait_for_application gitea || true

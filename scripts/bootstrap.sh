@@ -257,39 +257,33 @@ EOF
 }
 
 push_repository() {
-  local pod tmp_bundle
+  local pod tmp_bare repo_parent
   pod=$(get_gitea_pod)
-  tmp_bundle=$(mktemp "$LOG_DIR/agentic-k8s-XXXXXX.bundle")
-  if ! git -C "$REPO_ROOT" bundle create "$tmp_bundle" main >/dev/null 2>&1; then
-    log "WARNING: Failed to create git bundle for Gitea push"
-    rm -f "$tmp_bundle"
+  tmp_bare=$(mktemp -d "$LOG_DIR/agentic-k8s-XXXXXX.git")
+  repo_parent="/data/git/gitea-repositories/$GITEA_USER"
+
+  if ! git clone --bare "$REPO_ROOT" "$tmp_bare" >/dev/null 2>&1; then
+    log "WARNING: Failed to prepare bare repository for Gitea"
+    rm -rf "$tmp_bare"
     return
   fi
 
-  if ! kubectl exec -n gitea -c gitea "$pod" -- sh -c 'cat > /tmp/agentic-k8s.bundle' <"$tmp_bundle"; then
-    log "WARNING: Unable to stream repository bundle into the Gitea pod"
-    rm -f "$tmp_bundle"
+  if ! tar -C "$tmp_bare" -cf - . | kubectl exec -i -n gitea -c gitea "$pod" -- bash -c "
+    set -euo pipefail
+    repo_path=\"$repo_parent/agentic-k8s.git\"
+    mkdir -p \"\$(dirname \"\$repo_path\")\"
+    rm -rf \"\$repo_path\"
+    mkdir -p \"\$repo_path\"
+    tar -C \"\$repo_path\" -xf -
+    chown -R git:git \"\$repo_path\"
+  " >/dev/null 2>&1; then
+    log "WARNING: Failed to transfer repository into Gitea"
+    rm -rf "$tmp_bare"
     return
   fi
 
-  rm -f "$tmp_bundle"
-
-  if kubectl exec -n gitea -c gitea "$pod" -- env BOOTSTRAP_REPO_OWNER="$GITEA_USER" sh <<'EOF'
-set -euo pipefail
-rm -rf /tmp/bootstrap-agentic-k8s.git
-git clone --bare /tmp/agentic-k8s.bundle /tmp/bootstrap-agentic-k8s.git >/dev/null 2>&1
-repo_path="/data/git/gitea-repositories/${BOOTSTRAP_REPO_OWNER}/agentic-k8s.git"
-mkdir -p "$(dirname "$repo_path")"
-rm -rf "$repo_path"
-mv /tmp/bootstrap-agentic-k8s.git "$repo_path"
-chown -R git:git "$repo_path"
-rm -f /tmp/agentic-k8s.bundle
-EOF
-  then
-    add_summary "Pushed repository to local Gitea"
-  else
-    log "WARNING: Failed to push repository into Gitea"
-  fi
+  rm -rf "$tmp_bare"
+  add_summary "Pushed repository to local Gitea"
 }
 
 wait_for_application() {

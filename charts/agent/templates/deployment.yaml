@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agent.fullname" . }}
+  labels:
+    {{- include "agent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agent.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: GITEA_HOST
+              value: {{ .Values.gitea.host | quote }}
+            - name: GITEA_USER
+              value: {{ .Values.gitea.user | quote }}
+            - name: GITEA_PASSWORD
+              value: {{ .Values.gitea.password | quote }}
+            - name: GITEA_EMAIL
+              value: {{ .Values.gitea.email | quote }}
+            - name: LOOP_MESSAGE
+              value: {{ .Values.loopMessage | quote }}
+            - name: GIT_TERMINAL_PROMPT
+              value: "0"
+            {{- range .Values.extraEnv }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -euo pipefail
+              git config --global user.name "${GITEA_USER}"
+              git config --global user.email "${GITEA_EMAIL}"
+              git config --global credential.helper store
+              cat <<EOF > "${HOME}/.git-credentials"
+              http://${GITEA_USER}:${GITEA_PASSWORD}@${GITEA_HOST}
+              EOF
+              chmod 600 "${HOME}/.git-credentials"
+              printf '%s\n' "${LOOP_MESSAGE}"
+              while true; do sleep 30; done
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

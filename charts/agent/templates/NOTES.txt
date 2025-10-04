@@ -1,0 +1,3 @@
+The agent deployment exposes a long-running pod for Git workflows.
+Exec into the pod with:
+  kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "agent.fullname" . }} -- sh

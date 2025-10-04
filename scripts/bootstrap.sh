@@ -351,6 +351,7 @@ main() {
   kubectl apply -f argocd >/dev/null
   wait_for_application gitea || true
   wait_for_application nginx-example || true
+  wait_for_application agent || true
 
   printf '\nBootstrap summary:\n'
   for entry in "${SUMMARY[@]}"; do

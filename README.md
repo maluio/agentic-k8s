@@ -25,10 +25,30 @@ Port-forward logs are written to `${TMPDIR:-/tmp}/agentic-k8s` so you can inspec
 - Local [Gitea](https://gitea.com/) instance with this repository pushed and an admin user seeded
 - [Argo CD](https://argo-cd.readthedocs.io/) plus Applications that track the vendored charts
 - Sample `nginx-example` Helm chart deployment for quick smoke tests
+- A long-running `agent` utility pod equipped with Git and preloaded Gitea credentials for in-cluster workflows
 - Browser UI (Firefox via jlesage) for accessing cluster services, including a sidecar-served landing page of useful links
 - Firefox port-forward for the remote browser experience (other services are reachable via in-cluster DNS from that browser)
 
 That’s the entirety of the workflow—clone the repo, run `./scripts/bootstrap.sh`, and start building on the local cluster.
+
+### Agent Git workspace
+
+Need a shell inside the cluster with Git ready to talk to Gitea? Rely on the `agent` Deployment that ships with bootstrap:
+
+```bash
+kubectl -n tools exec -it deploy/agent -- sh
+```
+
+The container configures `git config --global` on start-up and writes a credential helper entry that points at `gitea-http.gitea.svc.cluster.local:3000` using the `agentadmin / agentadmin123!` account. That means you can immediately clone, pull, and push HTTP remotes without manually entering credentials:
+
+```bash
+git clone http://gitea-http.gitea.svc.cluster.local:3000/agentadmin/agentic-k8s.git
+cd agentic-k8s
+# hack away
+git push
+```
+
+If you override the Gitea credentials when installing the chart, the pod regenerates the Git configuration on restart, so exec back in after an upgrade or rollout to pick up the new values.
 
 ### Firefox landing page
 

@@ -1,0 +1,26 @@
+replicaCount: 1
+
+image:
+  repository: alpine/git
+  tag: "2.49.1"
+  pullPolicy: IfNotPresent
+
+podLabels: {}
+
+resources: {}
+
+nodeSelector: {}
+
+affinity: {}
+
+tolerations: []
+
+gitea:
+  host: gitea-http.gitea.svc.cluster.local:3000
+  user: agentadmin
+  password: agentadmin123!
+  email: agentadmin@example.com
+
+loopMessage: "Agent pod idle. Exec in for Git operations."
+
+extraEnv: []

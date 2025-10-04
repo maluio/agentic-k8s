@@ -1,0 +1,8 @@
+apiVersion: v2
+name: agent
+description: Utility workload that keeps a Git-ready shell available inside the cluster
+
+# Application chart providing a long-running pod for interactive Git workflows.
+type: application
+version: 0.1.0
+appVersion: "2.49.1"

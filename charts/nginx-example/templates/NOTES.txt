@@ -1,9 +1,0 @@
-Thanks for installing the nginx-example chart!
-
-To verify the release:
-  kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}"
-  kubectl get svc --namespace {{ .Release.Namespace }} {{ include "nginx-example.fullname" . }}
-
-If you need to reach the service locally, use port-forwarding:
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "nginx-example.fullname" . }} 8080:{{ .Values.service.port }}
-Then open http://127.0.0.1:8080/

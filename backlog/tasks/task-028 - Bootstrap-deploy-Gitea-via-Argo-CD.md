@@ -34,7 +34,7 @@ Extend the bootstrap script to register a Gitea Application in Argo CD and ensur
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-- Added manifests/argocd/gitea-application.yaml targeting the upstream Gitea Helm chart (sqlite, NodePort 32330, admin seeding).
+- Added manifests/argocd/gitea-application.yaml targeting the upstream Gitea Helm chart (sqlite, NodePort 32330, admin seeding with `GiteaRocks!123`).
 - Extended bootstrap.sh to apply the Application, tolerate rollout hiccups, capture the NodePort, and print it in the summary alongside existing info.
 - Documented Gitea access details (NodePort, default credentials) in README.
 - Validation: bash -n scripts/bootstrap.sh

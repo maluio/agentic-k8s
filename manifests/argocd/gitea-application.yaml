@@ -43,7 +43,7 @@ spec:
         - name: gitea.admin.username
           value: bn_user
         - name: gitea.admin.password
-          value: changeme
+          value: "GiteaRocks!123"
         - name: gitea.admin.email
           value: bn_user@example.com
   syncPolicy:

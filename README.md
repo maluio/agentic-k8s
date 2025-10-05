@@ -62,7 +62,7 @@ kubectl -n gitea get svc gitea-http -o jsonpath='{.spec.ports[?(@.name=="http")]
 kubectl get node -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
 ```
 
-The bootstrap config seeds an admin account (`bn_user` / `changeme`) for first-time access. You can update the password from the web UI once logged in.
+The bootstrap config seeds an admin account (`bn_user` / `GiteaRocks!123`) for first-time access. You can update the password from the web UI once logged in.
 
 ### Agent Kubeconfig
 

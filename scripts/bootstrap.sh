@@ -15,8 +15,6 @@ GITEA_TOKEN_SECRET_NAME="repo-agentic-k8s"
 CHARTS_REPO_NAME="agentic-k8s-charts"
 CHARTS_REPO_SECRET_NAME="repo-agentic-k8s-charts"
 
-FIREFOX_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/firefox 5801:5800 --address 127.0.0.1"
-
 log() {
   printf '[bootstrap] %s\n' "$1"
 }
@@ -120,56 +118,6 @@ ensure_gitea_user() {
     log "Creating Gitea admin user $GITEA_USER"
     kubectl exec -n gitea -c gitea "$pod" -- gitea admin user create --username "$GITEA_USER" --password "$GITEA_PASSWORD" --email "$GITEA_EMAIL" --admin --must-change-password=false
     add_summary "Created Gitea admin user"
-  fi
-}
-
-port_forward_active() {
-  local match=$1
-  local port=${2:-}
-
-  if pgrep -f "$match" >/dev/null 2>&1; then
-    return 0
-  fi
-
-  if [[ -n "$port" ]] && command -v ss >/dev/null 2>&1; then
-    if ss -tlnp 2>/dev/null | awk -v port="$port" '
-      $4 ~ ("127.0.0.1:" port) && $0 ~ /kubectl/ { found=1; exit }
-      END { exit found ? 0 : 1 }
-    '; then
-      return 0
-    fi
-  fi
-
-  return 1
-}
-
-ensure_port_forward() {
-  local label=$1
-  local match=$2
-  local command=$3
-  local logfile=$4
-  local port=${5:-}
-
-  if port_forward_active "$match" "$port"; then
-    log "$label port-forward already running"
-    add_summary "$label port-forward active"
-  else
-    log "Starting $label port-forward"
-    nohup bash -c "$command" >"$logfile" 2>&1 &
-    sleep 1
-    if port_forward_active "$match" "$port"; then
-      add_summary "Started $label port-forward"
-    else
-      if [[ -n "$port" ]] && command -v ss >/dev/null 2>&1; then
-        local listener
-        listener=$(ss -tlnp 2>/dev/null | awk -v port="$port" 'index($4, ":" port) { print $0 }')
-        if [[ -n "$listener" ]]; then
-          log "WARNING: Failed to start $label port-forward; 127.0.0.1:$port already in use: $listener"
-          return
-        fi
-      fi
-      log "WARNING: Failed to start $label port-forward (see $logfile)"
-    fi
   fi
 }
 
@@ -493,7 +441,13 @@ main() {
     helm_upgrade firefox charts/firefox tools --set-string dashboard.argoCdPassword="$argocd_password"
   fi
   wait_for_deployment tools firefox
-  ensure_port_forward "Firefox" "kubectl port-forward.*svc/firefox.*5801:5800" "$FIREFOX_PORT_FORWARD_CMD" "$LOG_DIR/firefox-port-forward.log" 5801
+  local firefox_node_port
+  firefox_node_port=$(kubectl -n tools get svc firefox -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+  if [[ -n "$firefox_node_port" ]]; then
+    add_summary "Firefox service exposed via NodePort ${firefox_node_port}"
+  else
+    log "WARNING: Unable to determine Firefox NodePort"
+  fi
 
   kubectl apply -f argocd >/dev/null
   wait_for_application gitea || true
@@ -505,14 +459,26 @@ main() {
     printf ' - %s\n' "$entry"
   done
 
+  local node_ip
+  node_ip=$(kubectl get node -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+  if [[ -z "$node_ip" ]]; then
+    node_ip="127.0.0.1"
+  fi
+
+  local firefox_address
+  if [[ -n "$firefox_node_port" ]]; then
+    firefox_address="http://${node_ip}:${firefox_node_port}/"
+  else
+    firefox_address="NodePort unavailable (inspect service tools/firefox)"
+  fi
+
   printf '\nAccess information:\n'
   printf ' - Gitea UI:      Access via Firefox landing page (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
   printf ' - Argo CD UI:    Access via Firefox landing page (admin user)\n'
   printf ' - Argo CD gRPC:  In-cluster service argocd-server.argocd.svc.cluster.local:443\n'
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
   printf ' - NGINX example: Available via nginx-example.default.svc.cluster.local\n'
-  printf ' - Firefox (web): http://127.0.0.1:5801/ (password firefox)\n'
-  printf '\nPort-forward logs: %s\n' "$LOG_DIR"
+  printf ' - Firefox (web): %s (password firefox)\n' "$firefox_address"
 }
 
 main "$@"

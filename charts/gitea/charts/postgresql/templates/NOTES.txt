@@ -104,12 +104,7 @@ To connect to your database from outside the cluster execute the following comma
     {{- end }}
 {{- else if contains "ClusterIP" .Values.primary.service.type }}
 
-    kubectl port-forward --namespace {{ $releaseNamespace }} svc/{{ include "postgresql.v1.primary.fullname" . }} {{ include "postgresql.v1.service.port" . }}:{{ include "postgresql.v1.service.port" . }} &
-    {{- if $authEnabled }}
-    PGPASSWORD="$POSTGRES_PASSWORD" psql --host 127.0.0.1 -U {{ default "postgres" $customUser }} -d {{- if include "postgresql.v1.database" . }} {{ include "postgresql.v1.database" . }}{{- else }} postgres{{- end }} -p {{ include "postgresql.v1.service.port" . }}
-    {{- else }}
-    psql --host 127.0.0.1 -d {{- if include "postgresql.v1.database" . }} {{ include "postgresql.v1.database" . }}{{- else }} postgres{{- end }} -p {{ include "postgresql.v1.service.port" . }}
-    {{- end }}
+    echo "Service is only reachable inside the cluster; switch to NodePort/LoadBalancer or use an in-cluster client to connect."
 {{- end }}
 {{- end }}
 

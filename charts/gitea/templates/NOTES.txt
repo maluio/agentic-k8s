@@ -15,8 +15,7 @@
   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "gitea.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo http://$SERVICE_IP:{{ .Values.service.port }}
 {{- else if contains "ClusterIP" .Values.service.http.type }}
-  echo "Visit http://127.0.0.1:{{ .Values.service.http.port }} to use your application"
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-http {{ .Values.service.http.port }}:{{ .Values.service.http.port }}
+  echo "Service is exposed internally via ClusterIP; enable ingress or switch to NodePort/LoadBalancer to reach it from outside the cluster."
 {{- end }}
 {{- $warnings := list -}}
 {{- if eq (get .Values.gitea.config.cache "ADAPTER") "memory" -}}

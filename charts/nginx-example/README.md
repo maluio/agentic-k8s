@@ -18,11 +18,7 @@ kubectl get pods -l app.kubernetes.io/instance=nginx-example
 kubectl get svc nginx-example
 ```
 
-To test HTTP access from your workstation:
-```bash
-kubectl port-forward svc/nginx-example 8080:80
-```
-Then open `http://127.0.0.1:8080/`.
+To test HTTP access from your workstation without relying on port-forwarding, install the chart with a NodePort service (for example `--set service.type=NodePort`). After deployment, run `kubectl get svc nginx-example -o wide` to see the allocated NodePort, then browse to `http://<node-ip>:<node-port>/`.
 
 ## Configuration
 Common parameters that can be overridden with `--set` or a custom `values.yaml`:

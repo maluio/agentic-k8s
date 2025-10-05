@@ -167,8 +167,7 @@ To connect to your database from outside the cluster execute the following comma
 
 {{- else if contains "ClusterIP" .Values.sentinel.service.type }}
 
-    kubectl port-forward --namespace {{ include "common.names.namespace" . }} svc/{{ template "common.names.fullname" . }} {{ .Values.sentinel.service.ports.valkey }}:{{ .Values.sentinel.service.ports.valkey }} &
-    {{ if .Values.auth.enabled }}REDISCLI_AUTH="$VALKEY_PASSWORD" {{ end }}valkey-cli -h 127.0.0.1 -p {{ .Values.sentinel.service.ports.valkey }} {{- if .Values.tls.enabled }} --tls --cert /tmp/client.cert --key /tmp/client.key --cacert /tmp/CA.cert{{ end }}
+    echo "Service is only reachable inside the cluster; expose via NodePort or LoadBalancer to connect from outside."
 
 {{- end }}
 {{- else }}
@@ -188,8 +187,7 @@ To connect to your database from outside the cluster execute the following comma
 
 {{- else if contains "ClusterIP" .Values.primary.service.type }}
 
-    kubectl port-forward --namespace {{ include "common.names.namespace" . }} svc/{{ printf "%s-primary" (include "common.names.fullname" .) }} {{ .Values.primary.service.ports.valkey }}:{{ .Values.primary.service.ports.valkey }} &
-    {{ if .Values.auth.enabled }}REDISCLI_AUTH="$VALKEY_PASSWORD" {{ end }}valkey-cli -h 127.0.0.1 -p {{ .Values.primary.service.ports.valkey }} {{- if .Values.tls.enabled }} --tls --cert /tmp/client.cert --key /tmp/client.key --cacert /tmp/CA.cert{{ end }}
+    echo "Service is only reachable inside the cluster; expose via NodePort or LoadBalancer to connect from outside."
 
 {{- end }}
 {{- end }}

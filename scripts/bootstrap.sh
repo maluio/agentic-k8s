@@ -164,7 +164,7 @@ create_gitea_repo() {
 }
 
 ensure_repo_secret() {
-  local token
+  local token=""
   if kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd >/dev/null 2>&1; then
     token=$(kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd -o jsonpath='{.data.password}' | base64 -d)
   fi

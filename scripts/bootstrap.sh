@@ -9,6 +9,7 @@ mkdir -p "$LOG_DIR"
 SUMMARY=()
 ARGOCD_MANIFEST_URL="https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
 ARGOCD_NODEPORT=""
+GITEA_NODEPORT=""
 
 log() {
   printf '[bootstrap] %s\n' "$1"
@@ -211,6 +212,42 @@ install_argocd() {
   wait_for_statefulset argocd argocd-application-controller || true
 }
 
+deploy_gitea_via_argocd() {
+  log "Applying Gitea Argo CD Application"
+  kubectl apply -n argocd -f "$REPO_ROOT/manifests/argocd/gitea-application.yaml" >/dev/null
+  add_summary "Applied Gitea Argo CD Application"
+
+  local waited=false
+  for _ in {1..60}; do
+    if kubectl get statefulset gitea -n gitea >/dev/null 2>&1; then
+      log "Waiting for Gitea statefulset"
+      wait_for_statefulset gitea gitea
+      waited=true
+      break
+    fi
+    if kubectl get deployment gitea -n gitea >/dev/null 2>&1; then
+      log "Waiting for Gitea deployment"
+      wait_for_deployment gitea gitea
+      waited=true
+      break
+    fi
+    sleep 5
+  done
+
+  if [[ "$waited" != true ]]; then
+    log "WARNING: Timed out waiting for Gitea workload"
+  fi
+
+  local nodeport
+  nodeport=$(kubectl get svc gitea-http -n gitea -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+  if [[ -n "$nodeport" ]]; then
+    GITEA_NODEPORT="$nodeport"
+    add_summary "Gitea Service NodePort:$nodeport"
+  else
+    log "WARNING: Unable to determine Gitea NodePort"
+  fi
+}
+
 main() {
   cd "$REPO_ROOT"
 
@@ -222,6 +259,7 @@ main() {
   install_argocd
   ensure_agent_kubeconfig
   ensure_argocd_nodeport
+  deploy_gitea_via_argocd
 
   local argocd_password
   argocd_password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
@@ -254,6 +292,14 @@ main() {
     printf ' - Argo CD HTTPS NodePort: <unknown; run kubectl -n argocd get svc argocd-server>\n'
     printf ' - Optional port-forward: kubectl port-forward -n argocd svc/argocd-server 8080:443\n'
     printf ' - Once forwarded: https://localhost:8080 (user: admin)\n'
+  fi
+  if [[ -z "$GITEA_NODEPORT" ]]; then
+    GITEA_NODEPORT=$(kubectl get svc gitea-http -n gitea -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+  fi
+  if [[ -n "$GITEA_NODEPORT" ]]; then
+    printf ' - Gitea NodePort: http://%s:%s\n' "$node_ip" "$GITEA_NODEPORT"
+  else
+    printf ' - Gitea NodePort: http://%s:%s\n' "$node_ip" "<unknown>"
   fi
   printf ' - Agent kubeconfig (read-only): %s\n' "$REPO_ROOT/agent/kubeconfig"
 }

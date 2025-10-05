@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+spec:
+  destination:
+    namespace: gitea
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: gitea
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 12.0.0
+    helm:
+      parameters:
+        - name: service.type
+          value: NodePort
+        - name: service.http.port
+          value: "3000"
+        - name: service.http.nodePort
+          value: "32330"
+        - name: service.ssh.enabled
+          value: "false"
+        - name: ingress.enabled
+          value: "false"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

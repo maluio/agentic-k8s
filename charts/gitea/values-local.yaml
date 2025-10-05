@@ -11,6 +11,10 @@ postgresql:
   enabled: false
 
 gitea:
+  service:
+    http:
+      type: NodePort
+      nodePort: 30300
   config:
     database:
       DB_TYPE: sqlite3

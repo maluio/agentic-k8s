@@ -66,4 +66,13 @@ Argo CD automatically reconciles the Applications after the push. Watch the stat
 
 ### Accessing service endpoints
 
-Bootstrap now focuses on in-cluster workflows. Services expose cluster DNS names such as `http://gitea-http.gitea.svc.cluster.local:3000/` and `https://argocd-server.argocd.svc.cluster.local/`. Use the `agent` pod (or another in-cluster workload) to interact with those URLs directly. If you need local workstation access, layer on your preferred exposure mechanism (for example, create a temporary `kubectl port-forward` or configure a NodePort/Ingress in your own values override).
+Bootstrap now exposes the key services via NodePort so you can reach them from your workstation without additional tunnels. By default the script prints the InternalIP of the K3s node alongside these ports:
+
+| Service | NodePort | URL format |
+|---------|----------|------------|
+| Gitea HTTP | `30300` | `http://<node-ip>:30300/` |
+| Argo CD HTTP | `30480` | `http://<node-ip>:30480/` |
+| Argo CD HTTPS / gRPC | `31443` | `https://<node-ip>:31443/` |
+| nginx-example | `30800` | `http://<node-ip>:30800/` |
+
+Replace `<node-ip>` with the value reported in the bootstrap summary (or run `kubectl get node -o wide`). Credentials remain the same; for example, sign into Gitea using `agentadmin / agentadmin123!` and Argo CD with the admin password shown in the summary.

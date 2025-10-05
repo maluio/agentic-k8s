@@ -1,9 +1,11 @@
 server:
   service:
-    type: ClusterIP
+    type: NodePort
     ports:
       http: 80
       https: 443
+    nodePortHttp: 30480
+    nodePortHttps: 31443
   ingress:
     enabled: false
 configs:

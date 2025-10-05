@@ -65,9 +65,27 @@ ensure_helm() {
 }
 
 wait_for_nodes() {
+  log "Waiting for Kubernetes nodes to register..."
+  local node_list=""
+  for _ in {1..60}; do
+    node_list=$(kubectl get nodes --no-headers 2>/dev/null || true)
+    if [[ -n "$node_list" ]]; then
+      break
+    fi
+    sleep 2
+  done
+
+  if [[ -z "$node_list" ]]; then
+    log "WARNING: No Kubernetes nodes detected after waiting; proceeding anyway"
+    return
+  fi
+
   log "Waiting for Kubernetes nodes to be Ready..."
-  kubectl wait --for=condition=Ready node --all --timeout=120s >/dev/null
-  log "Kubernetes nodes Ready"
+  if ! kubectl wait --for=condition=Ready node --all --timeout=180s >/dev/null 2>&1; then
+    log "WARNING: Kubernetes nodes did not reach Ready within timeout"
+  else
+    log "Kubernetes nodes Ready"
+  fi
 }
 
 helm_upgrade() {
@@ -445,12 +463,45 @@ main() {
     printf ' - %s\n' "$entry"
   done
 
+  local node_ip
+  node_ip=$(kubectl get node -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+  if [[ -z "$node_ip" ]]; then
+    node_ip="127.0.0.1"
+  fi
+
+  local gitea_node_port
+  gitea_node_port=$(kubectl -n gitea get svc gitea-http -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+  local argocd_http_node_port
+  argocd_http_node_port=$(kubectl -n argocd get svc argocd-server -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+  local argocd_https_node_port
+  argocd_https_node_port=$(kubectl -n argocd get svc argocd-server -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)
+  local nginx_node_port
+  nginx_node_port=$(kubectl get svc nginx-example -n default -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+
   printf '\nAccess information:\n'
-  printf ' - Gitea UI:      http://gitea-http.gitea.svc.cluster.local:3000/ (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
-  printf ' - Argo CD UI:    https://argocd-server.argocd.svc.cluster.local/ (admin user)\n'
-  printf ' - Argo CD gRPC:  In-cluster service argocd-server.argocd.svc.cluster.local:443\n'
+  if [[ -n "$gitea_node_port" ]]; then
+    printf ' - Gitea UI:      http://%s:%s/ (credentials %s / %s)\n' "$node_ip" "$gitea_node_port" "$GITEA_USER" "$GITEA_PASSWORD"
+  else
+    printf ' - Gitea UI:      http://gitea-http.gitea.svc.cluster.local:3000/ (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
+  fi
+  if [[ -n "$argocd_http_node_port" ]]; then
+    printf ' - Argo CD HTTP:  http://%s:%s/ (admin user)\n' "$node_ip" "$argocd_http_node_port"
+  else
+    printf ' - Argo CD HTTP:  http://argocd-server.argocd.svc.cluster.local/ (admin user)\n'
+  fi
+  if [[ -n "$argocd_https_node_port" ]]; then
+    printf ' - Argo CD HTTPS: https://%s:%s/ (admin user)\n' "$node_ip" "$argocd_https_node_port"
+    printf ' - Argo CD gRPC:  %s:%s (TLS)\n' "$node_ip" "$argocd_https_node_port"
+  else
+    printf ' - Argo CD HTTPS: https://argocd-server.argocd.svc.cluster.local/ (admin user)\n'
+    printf ' - Argo CD gRPC:  argocd-server.argocd.svc.cluster.local:443 (TLS)\n'
+  fi
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
-  printf ' - NGINX example: http://nginx-example.default.svc.cluster.local/\n'
+  if [[ -n "$nginx_node_port" ]]; then
+    printf ' - NGINX example: http://%s:%s/\n' "$node_ip" "$nginx_node_port"
+  else
+    printf ' - NGINX example: http://nginx-example.default.svc.cluster.local/\n'
+  fi
 }
 
 main "$@"

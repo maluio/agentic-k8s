@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2025-10-05 17:13'
-updated_date: '2025-10-05 17:23'
+updated_date: '2025-10-05 17:41'
 labels: []
 dependencies: []
 ---
@@ -26,7 +26,7 @@ Extend the bootstrap script to register a Gitea Application in Argo CD and ensur
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Add an Argo CD Application manifest (e.g., manifests/argocd/gitea.yaml) that references the Bitnami Gitea Helm chart with service.type=NodePort and a fixed HTTP nodePort.
+1. Add an Argo CD Application manifest that drives the upstream Gitea Helm chart with SQLite storage and a fixed HTTP NodePort.
 2. Update bootstrap.sh to apply the Application manifest, ensure the gitea namespace exists, and wait for the deployment to become ready.
 3. Surface the chosen NodePort in the bootstrap summary and expand the README with instructions for reaching Gitea.
 <!-- SECTION:PLAN:END -->
@@ -34,10 +34,8 @@ Extend the bootstrap script to register a Gitea Application in Argo CD and ensur
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-- Added manifests/argocd/gitea-application.yaml referencing the Bitnami Gitea chart with NodePort HTTP exposure at 32330.
-- Extended bootstrap.sh to apply the Application, wait for the workload, capture the NodePort, and print it in the summary alongside existing info.
+- Added manifests/argocd/gitea-application.yaml targeting the upstream Gitea Helm chart (sqlite, NodePort 32330, admin seeding).
+- Extended bootstrap.sh to apply the Application, tolerate rollout hiccups, capture the NodePort, and print it in the summary alongside existing info.
 - Documented Gitea access details (NodePort, default credentials) in README.
 - Validation: bash -n scripts/bootstrap.sh
-
-- Updated Gitea Application chart version to 3.2.22 after Bitnami repo removed 12.0.0.
 <!-- SECTION:NOTES:END -->

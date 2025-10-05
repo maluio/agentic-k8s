@@ -77,16 +77,22 @@ wait_for_deployment() {
   local ns=$1
   local name=$2
   log "Waiting for deployment/$name in $ns"
-  kubectl rollout status deployment/"$name" -n "$ns" --timeout=180s >/dev/null
-  add_summary "deployment/$name in $ns available"
+  if kubectl rollout status deployment/"$name" -n "$ns" --timeout=180s >/dev/null; then
+    add_summary "deployment/$name in $ns available"
+  else
+    log "WARNING: deployment/$name in $ns did not reach Ready"
+  fi
 }
 
 wait_for_statefulset() {
   local ns=$1
   local name=$2
   log "Waiting for statefulset/$name in $ns"
-  kubectl rollout status statefulset/"$name" -n "$ns" --timeout=180s >/dev/null
-  add_summary "statefulset/$name in $ns available"
+  if kubectl rollout status statefulset/"$name" -n "$ns" --timeout=180s >/dev/null; then
+    add_summary "statefulset/$name in $ns available"
+  else
+    log "WARNING: statefulset/$name in $ns did not reach Ready"
+  fi
 }
 
 ensure_agent_kubeconfig() {

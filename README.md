@@ -55,18 +55,14 @@ From there you can add your own Git repositories and Application definitions dir
 
 ### Accessing Gitea
 
-Bootstrap now deploys Gitea via Argo CD using the Bitnami chart and exposes the HTTP service on NodePort `32330`. Once bootstrap finishes, use the printed node IP to reach `http://<node-ip>:32330`. To double-check the port or IP, run:
+Bootstrap now deploys Gitea via Argo CD using the upstream Gitea Helm chart configured for SQLite and exposes the HTTP service on NodePort `32330`. Once bootstrap finishes, use the printed node IP to reach `http://<node-ip>:32330`. To double-check the port or IP, run:
 
 ```bash
 kubectl -n gitea get svc gitea-http -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}'
 kubectl get node -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
 ```
 
-Default credentials for the Bitnami chart are user `bn_user` with the password stored in the `gitea` secret under key `admin-password`:
-
-```bash
-kubectl -n gitea get secret gitea -o jsonpath='{.data.admin-password}' | base64 -d
-```
+The bootstrap config seeds an admin account (`bn_user` / `changeme`) for first-time access. You can update the password from the web UI once logged in.
 
 ### Agent Kubeconfig
 

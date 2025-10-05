@@ -36,13 +36,20 @@ That’s the entirety of the workflow—clone the repo, run `./scripts/bootstrap
 
 ### Accessing Argo CD
 
-By default the Argo CD server is exposed inside the cluster. To reach the UI from your workstation, port-forward the service:
+The bootstrap script patches the `argocd-server` Service to `NodePort`, defaulting the HTTPS endpoint to `32443`. After the summary prints the node IP you can browse directly to `https://<node-ip>:32443` and sign in with user `admin` and the password reported in the output (or retrieved manually with `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`).
+
+Want to confirm the assigned port or the node IP? Run:
+
+```bash
+kubectl -n argocd get svc argocd-server -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}'
+kubectl get node -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+```
+
+If you prefer a local tunnel instead, you can still port-forward the service:
 
 ```bash
 kubectl port-forward -n argocd svc/argocd-server 8080:443
 ```
-
-Then open `https://localhost:8080` in your browser and sign in with user `admin` and the password printed in the bootstrap summary (you can also retrieve it manually with `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`).
 
 From there you can add your own Git repositories and Application definitions directly through the Argo CD UI or CLI.
 

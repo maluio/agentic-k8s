@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2025-10-05 17:13'
-updated_date: '2025-10-05 17:19'
+updated_date: '2025-10-05 17:23'
 labels: []
 dependencies: []
 ---
@@ -38,4 +38,6 @@ Extend the bootstrap script to register a Gitea Application in Argo CD and ensur
 - Extended bootstrap.sh to apply the Application, wait for the workload, capture the NodePort, and print it in the summary alongside existing info.
 - Documented Gitea access details (NodePort, default credentials) in README.
 - Validation: bash -n scripts/bootstrap.sh
+
+- Updated Gitea Application chart version to 3.2.22 after Bitnami repo removed 12.0.0.
 <!-- SECTION:NOTES:END -->

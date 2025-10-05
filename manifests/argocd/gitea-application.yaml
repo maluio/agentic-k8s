@@ -11,7 +11,7 @@ spec:
   source:
     chart: gitea
     repoURL: https://charts.bitnami.com/bitnami
-    targetRevision: 12.0.0
+    targetRevision: 3.2.22
     helm:
       parameters:
         - name: service.type

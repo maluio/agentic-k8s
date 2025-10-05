@@ -17,7 +17,13 @@ Open a shell inside the pod:
 ```bash
 kubectl -n tools exec -it deploy/agent -- sh
 ```
-A `.git-credentials` file is pre-populated with the username/password from `values.yaml`, and Git user metadata is configured automatically.
+A `.git-credentials` file is pre-populated with the username/password from `values.yaml`, and Git user metadata is configured automatically. Clone the GitOps repository seeded by bootstrap and iterate:
+
+```bash
+git clone http://gitea-http.gitea.svc.cluster.local:3000/agentadmin/agentic-k8s-charts.git
+cd agentic-k8s-charts
+# make chart changes, commit, and push
+```
 
 ## Configuration
 Key values you might override:
@@ -26,7 +32,7 @@ Key values you might override:
 |-----------|-------------|---------|
 | `replicaCount` | Number of agent pods | `1` |
 | `image.repository` | Container image | `alpine/git` |
-| `image.tag` | Image tag | `2.47.0` |
+| `image.tag` | Image tag | `2.49.1` |
 | `gitea.host` | Host:port for the in-cluster Gitea HTTP service | `gitea-http.gitea.svc.cluster.local:3000` |
 | `gitea.user` | Username written to Git config and credentials helper | `agentadmin` |
 | `gitea.password` | Password persisted to `~/.git-credentials` | `agentadmin123!` |

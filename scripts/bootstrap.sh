@@ -12,6 +12,8 @@ GITEA_USER="agentadmin"
 GITEA_EMAIL="agentadmin@example.com"
 GITEA_PASSWORD="agentadmin123!"
 GITEA_TOKEN_SECRET_NAME="repo-agentic-k8s"
+CHARTS_REPO_NAME="agentic-k8s-charts"
+CHARTS_REPO_SECRET_NAME="repo-agentic-k8s-charts"
 
 FIREFOX_PORT_FORWARD_CMD="kubectl port-forward -n tools svc/firefox 5801:5800 --address 127.0.0.1"
 
@@ -214,29 +216,30 @@ create_gitea_repo() {
 }
 
 ensure_repo_secret() {
-  local existing_token
+  local token
   if kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd >/dev/null 2>&1; then
-    existing_token=$(kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd -o jsonpath='{.data.password}' | base64 -d)
-    if [[ -n "$existing_token" ]]; then
-      printf '[bootstrap] %s\n' "Reusing existing Argo CD repository secret" >&2
-      return 0
-    fi
+    token=$(kubectl get secret "$GITEA_TOKEN_SECRET_NAME" -n argocd -o jsonpath='{.data.password}' | base64 -d)
   fi
 
-  kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
-  local pod token_name output token
-  pod=$(get_gitea_pod)
-  token_name="bootstrap-$(date +%s)"
-  output=$(kubectl exec -n gitea -c gitea "$pod" -- gitea admin user generate-access-token --username "$GITEA_USER" --token-name "$token_name" 2>&1)
-  if [[ $? -ne 0 ]]; then
-    printf '[bootstrap] ERROR: %s\n' "Unable to create Gitea token. Output: $output" >&2
-    exit 1
-  fi
-  token=$(echo "$output" | awk -F': ' 'NF>1 {print $2}' | tr -d '\r\n')
   if [[ -z "$token" ]]; then
-    printf '[bootstrap] ERROR: %s\n' "Could not parse Gitea token output: $output" >&2
-    exit 1
+    kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+    local pod token_name output
+    pod=$(get_gitea_pod)
+    token_name="bootstrap-$(date +%s)"
+    output=$(kubectl exec -n gitea -c gitea "$pod" -- gitea admin user generate-access-token --username "$GITEA_USER" --token-name "$token_name" 2>&1)
+    if [[ $? -ne 0 ]]; then
+      printf '[bootstrap] ERROR: %s\n' "Unable to create Gitea token. Output: $output" >&2
+      exit 1
+    fi
+    token=$(echo "$output" | awk -F': ' 'NF>1 {print $2}' | tr -d '\r\n')
+    if [[ -z "$token" ]]; then
+      printf '[bootstrap] ERROR: %s\n' "Could not parse Gitea token output: $output" >&2
+      exit 1
+    fi
+    add_summary "Created Argo CD repository token"
+  else
+    printf '[bootstrap] %s\n' "Reusing existing Argo CD repository token" >&2
   fi
 
   cat <<EOF | kubectl apply -f - >/dev/null
@@ -253,7 +256,23 @@ stringData:
   username: $GITEA_USER
   password: $token
 EOF
-  add_summary "Created Argo CD repository secret"
+
+  cat <<EOF | kubectl apply -f - >/dev/null
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $CHARTS_REPO_SECRET_NAME
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  name: $CHARTS_REPO_NAME
+  url: http://gitea-http.gitea.svc.cluster.local:3000/$GITEA_USER/$CHARTS_REPO_NAME.git
+  username: $GITEA_USER
+  password: $token
+EOF
+
+  add_summary "Ensured Argo CD repository secrets"
 }
 
 push_repository() {
@@ -284,6 +303,132 @@ push_repository() {
 
   rm -rf "$tmp_bare"
   add_summary "Pushed repository to local Gitea"
+}
+
+create_charts_repo() {
+  local pod status
+  pod=$(get_gitea_pod)
+  status=$(kubectl exec -n gitea -c gitea "$pod" -- \
+    curl -sS -o /dev/null -w '%{http_code}' \
+      -u "$GITEA_USER:$GITEA_PASSWORD" \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"'"$CHARTS_REPO_NAME"'","private":false,"default_branch":"main"}' \
+      http://127.0.0.1:3000/api/v1/user/repos 2>/dev/null || true)
+
+  if [[ "$status" == "201" ]]; then
+    add_summary "Created repository $GITEA_USER/$CHARTS_REPO_NAME in Gitea"
+  elif [[ "$status" == "409" ]]; then
+    printf '[bootstrap] %s\n' "Repository $GITEA_USER/$CHARTS_REPO_NAME already exists" >&2
+  else
+    printf '[bootstrap] WARNING: Unexpected response creating $CHARTS_REPO_NAME repository (HTTP %s)\n' "$status" >&2
+  fi
+}
+
+push_charts_repository() {
+  local pod repo_parent tmp_existing tmp_work tmp_bare
+  pod=$(get_gitea_pod)
+  repo_parent="/data/git/gitea-repositories/$GITEA_USER"
+  tmp_existing=$(mktemp -d "$LOG_DIR/$CHARTS_REPO_NAME-existing-XXXXXX.git")
+  tmp_work=$(mktemp -d "$LOG_DIR/$CHARTS_REPO_NAME-work-XXXXXX")
+
+  if kubectl exec -n gitea -c gitea "$pod" -- test -d "$repo_parent/$CHARTS_REPO_NAME.git"; then
+    if ! kubectl exec -n gitea -c gitea "$pod" -- tar -C "$repo_parent/$CHARTS_REPO_NAME.git" -cf - . | tar -C "$tmp_existing" -xf - >/dev/null 2>&1; then
+      log "WARNING: Failed to copy existing $CHARTS_REPO_NAME repository"
+      rm -rf "$tmp_existing" "$tmp_work"
+      return
+    fi
+    if ! git clone "$tmp_existing" "$tmp_work" >/dev/null 2>&1; then
+      log "WARNING: Failed to clone staged $CHARTS_REPO_NAME repository"
+      rm -rf "$tmp_existing" "$tmp_work"
+      return
+    fi
+    pushd "$tmp_work" >/dev/null
+    if ! git checkout main >/dev/null 2>&1; then
+      log "WARNING: Failed to checkout main branch for $CHARTS_REPO_NAME"
+      popd >/dev/null
+      rm -rf "$tmp_existing" "$tmp_work"
+      return
+    fi
+  else
+    rm -rf "$tmp_existing"
+    tmp_existing=""
+    pushd "$tmp_work" >/dev/null
+    if ! git init >/dev/null 2>&1; then
+      log "WARNING: Failed to init $CHARTS_REPO_NAME staging repo"
+      popd >/dev/null
+      rm -rf "$tmp_work"
+      return
+    fi
+    if ! git checkout -b main >/dev/null 2>&1; then
+      log "WARNING: Failed to create main branch for $CHARTS_REPO_NAME"
+      popd >/dev/null
+      rm -rf "$tmp_work"
+      return
+    fi
+  fi
+
+  rm -rf "$tmp_work/charts"
+  if ! tar -C "$REPO_ROOT" -cf - charts | tar -C "$tmp_work" -xf - >/dev/null 2>&1; then
+    log "WARNING: Failed to stage charts content for $CHARTS_REPO_NAME"
+    popd >/dev/null
+    rm -rf "$tmp_existing" "$tmp_work"
+    return
+  fi
+
+  git config user.name "$GITEA_USER"
+  git config user.email "$GITEA_EMAIL"
+  git add charts >/dev/null 2>&1
+
+  if git diff --cached --quiet; then
+    log "$CHARTS_REPO_NAME already up to date"
+    popd >/dev/null
+    rm -rf "$tmp_existing" "$tmp_work"
+    return
+  fi
+
+  if ! git commit -m "Sync charts from bootstrap" >/dev/null 2>&1; then
+    log "WARNING: Failed to commit charts content"
+    popd >/dev/null
+    rm -rf "$tmp_existing" "$tmp_work"
+    return
+  fi
+
+  if [[ -n "$tmp_existing" ]]; then
+    if ! git push origin main >/dev/null 2>&1; then
+      log "WARNING: Failed to update staged $CHARTS_REPO_NAME repo"
+      popd >/dev/null
+      rm -rf "$tmp_existing" "$tmp_work"
+      return
+    fi
+    popd >/dev/null
+    tmp_bare="$tmp_existing"
+  else
+    tmp_bare=$(mktemp -d "$LOG_DIR/$CHARTS_REPO_NAME-XXXXXX.git")
+    if ! git clone --bare "$tmp_work" "$tmp_bare" >/dev/null 2>&1; then
+      log "WARNING: Failed to create bare $CHARTS_REPO_NAME repo"
+      popd >/dev/null
+      rm -rf "$tmp_work" "$tmp_bare"
+      return
+    fi
+    popd >/dev/null
+  fi
+
+  if ! tar -C "$tmp_bare" -cf - . | kubectl exec -i -n gitea -c gitea "$pod" -- bash -c "
+    set -euo pipefail
+    repo_path=\"$repo_parent/$CHARTS_REPO_NAME.git\"
+    mkdir -p \"\$(dirname \"\$repo_path\")\"
+    rm -rf \"\$repo_path\"
+    mkdir -p \"\$repo_path\"
+    tar -C \"\$repo_path\" -xf -
+    chown -R git:git \"\$repo_path\"
+  " >/dev/null 2>&1; then
+    log "WARNING: Failed to transfer $CHARTS_REPO_NAME into Gitea"
+    rm -rf "$tmp_work" "$tmp_bare"
+    return
+  fi
+
+  rm -rf "$tmp_work" "$tmp_bare"
+  add_summary "Synced $CHARTS_REPO_NAME repository to Gitea"
 }
 
 wait_for_application() {
@@ -325,6 +470,8 @@ main() {
   ensure_repo_secret
   create_gitea_repo
   push_repository
+  create_charts_repo
+  push_charts_repository
 
   helm_upgrade argocd charts/argo-cd argocd -f charts/argo-cd/values-local.yaml
   wait_for_deployment argocd argocd-server

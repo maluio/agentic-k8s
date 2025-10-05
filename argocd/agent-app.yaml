@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/agentadmin/agentic-k8s.git
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/agentadmin/agentic-k8s-charts.git
     targetRevision: main
     path: charts/agent
   destination:

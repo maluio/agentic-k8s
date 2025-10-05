@@ -26,6 +26,7 @@ Port-forward logs are written to `${TMPDIR:-/tmp}/agentic-k8s` so you can inspec
 - [Argo CD](https://argo-cd.readthedocs.io/) plus Applications that track the vendored charts
 - Sample `nginx-example` Helm chart deployment for quick smoke tests
 - A long-running `agent` utility pod equipped with Git and preloaded Gitea credentials for in-cluster workflows
+- A dedicated `agentic-k8s-charts` GitOps repository inside Gitea that Argo CD watches for chart updates
 - Browser UI (Firefox via jlesage) for accessing cluster services, including a sidecar-served landing page of useful links
 - Firefox port-forward for the remote browser experience (other services are reachable via in-cluster DNS from that browser)
 
@@ -39,16 +40,24 @@ Need a shell inside the cluster with Git ready to talk to Gitea? Rely on the `ag
 kubectl -n tools exec -it deploy/agent -- sh
 ```
 
-The container configures `git config --global` on start-up and writes a credential helper entry that points at `gitea-http.gitea.svc.cluster.local:3000` using the `agentadmin / agentadmin123!` account. That means you can immediately clone, pull, and push HTTP remotes without manually entering credentials:
+The container configures `git config --global` on start-up and writes a credential helper entry that points at `gitea-http.gitea.svc.cluster.local:3000` using the `agentadmin / agentadmin123!` account. That means you can immediately clone, pull, and push HTTP remotes without manually entering credentials.
+
+### GitOps chart updates
+
+Argo CD now tracks the `agentic-k8s-charts` repository that bootstrap seeds inside Gitea. To ship a chart tweak from the in-cluster agent pod:
 
 ```bash
-git clone http://gitea-http.gitea.svc.cluster.local:3000/agentadmin/agentic-k8s.git
-cd agentic-k8s
-# hack away
+# Inside the agent shell
+cd /tmp
+git clone http://gitea-http.gitea.svc.cluster.local:3000/agentadmin/agentic-k8s-charts.git
+cd agentic-k8s-charts
+# edit the charts/ tree (for example bump the agent image tag)
+git status
+git commit -am "Describe your change"
 git push
 ```
 
-If you override the Gitea credentials when installing the chart, the pod regenerates the Git configuration on restart, so exec back in after an upgrade or rollout to pick up the new values.
+Argo CD automatically reconciles the Applications after the push. Watch the status with `kubectl -n argocd get applications.argoproj.io` or use the Firefox dashboard link. If you override the Gitea credentials when installing the chart, the pod regenerates the Git configuration on restart, so exec back in after an upgrade or rollout to pick up the new values.
 
 ### Firefox landing page
 

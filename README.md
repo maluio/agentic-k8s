@@ -14,6 +14,7 @@ After the script completes it prints:
 - Whether K3s or kubectl were installed or reused
 - Confirmation that the Argo CD components reached a healthy state
 - The Argo CD admin password and a suggested port-forward command for logging in locally
+- The filesystem path to an `agent/kubeconfig` file with read-only credentials
 
 ### Reset the Cluster
 
@@ -44,3 +45,7 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443
 Then open `https://localhost:8080` in your browser and sign in with user `admin` and the password printed in the bootstrap summary (you can also retrieve it manually with `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`).
 
 From there you can add your own Git repositories and Application definitions directly through the Argo CD UI or CLI.
+
+### Agent Kubeconfig
+
+The bootstrap script writes a read-only kubeconfig to `agent/kubeconfig`. Use this configuration when you need to grant automation (or a human operator) inspect-only access to the cluster without risking mutating changes. The credentials are bound to a Kubernetes service account mapped to the built-in `view` ClusterRole.

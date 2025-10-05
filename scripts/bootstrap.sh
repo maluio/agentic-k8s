@@ -87,6 +87,76 @@ wait_for_statefulset() {
   add_summary "statefulset/$name in $ns available"
 }
 
+ensure_agent_kubeconfig() {
+  local agent_dir="$REPO_ROOT/agent"
+  local namespace="default"
+  local service_account="agent-readonly"
+  local clusterrolebinding="agent-readonly-view"
+  local kubeconfig_path="$agent_dir/kubeconfig"
+
+  log "Preparing read-only kubeconfig for agent workflows"
+  mkdir -p "$agent_dir"
+
+  kubectl create serviceaccount "$service_account" \
+    --namespace "$namespace" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+  kubectl create clusterrolebinding "$clusterrolebinding" \
+    --clusterrole=view \
+    --serviceaccount="$namespace:$service_account" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+  local token
+  if ! token=$(kubectl create token "$service_account" --namespace "$namespace" 2>/dev/null | tr -d '\n'); then
+    log "WARNING: Unable to generate token for $namespace/$service_account; skipping kubeconfig output"
+    return
+  fi
+
+  local server
+  server=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null | tr -d '\n' || true)
+  if [[ -z "$server" ]]; then
+    log "WARNING: Unable to resolve cluster server for agent kubeconfig"
+    return
+  fi
+
+  local ca_data
+  ca_data=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' 2>/dev/null | tr -d '\n' || true)
+  if [[ -z "$ca_data" ]]; then
+    local ca_file
+    ca_file=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority}' 2>/dev/null | tr -d '\n' || true)
+    if [[ -n "$ca_file" && -r "$ca_file" ]]; then
+      ca_data=$(base64 <"$ca_file" 2>/dev/null | tr -d '\n' || true)
+    fi
+  fi
+  if [[ -z "$ca_data" ]]; then
+    log "WARNING: Unable to resolve cluster CA data for agent kubeconfig"
+    return
+  fi
+
+  cat >"$kubeconfig_path" <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: $ca_data
+    server: $server
+  name: agentic-k8s
+contexts:
+- context:
+    cluster: agentic-k8s
+    user: $service_account
+  name: agentic-k8s
+current-context: agentic-k8s
+users:
+- name: $service_account
+  user:
+    token: $token
+EOF
+
+  chmod 600 "$kubeconfig_path" || true
+  add_summary "Generated read-only kubeconfig at agent/kubeconfig"
+}
+
 install_argocd() {
   log "Ensuring argocd namespace exists"
   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -109,6 +179,7 @@ main() {
   ensure_kubectl
   wait_for_nodes
   install_argocd
+  ensure_agent_kubeconfig
 
   local argocd_password
   argocd_password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
@@ -135,6 +206,7 @@ main() {
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
   printf ' - Access via port-forward: kubectl port-forward -n argocd svc/argocd-server 8080:443\n'
   printf ' - Once forwarded: https://localhost:8080 (user: admin)\n'
+  printf ' - Agent kubeconfig (read-only): %s\n' "$REPO_ROOT/agent/kubeconfig"
 }
 
 main "$@"

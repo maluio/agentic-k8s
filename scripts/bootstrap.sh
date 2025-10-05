@@ -435,20 +435,6 @@ main() {
     log "WARNING: Unable to read Argo CD admin password"
   fi
 
-  if [[ "$argocd_password" == "<unknown>" ]]; then
-    helm_upgrade firefox charts/firefox tools
-  else
-    helm_upgrade firefox charts/firefox tools --set-string dashboard.argoCdPassword="$argocd_password"
-  fi
-  wait_for_deployment tools firefox
-  local firefox_node_port
-  firefox_node_port=$(kubectl -n tools get svc firefox -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
-  if [[ -n "$firefox_node_port" ]]; then
-    add_summary "Firefox service exposed via NodePort ${firefox_node_port}"
-  else
-    log "WARNING: Unable to determine Firefox NodePort"
-  fi
-
   kubectl apply -f argocd >/dev/null
   wait_for_application gitea || true
   wait_for_application nginx-example || true
@@ -459,26 +445,12 @@ main() {
     printf ' - %s\n' "$entry"
   done
 
-  local node_ip
-  node_ip=$(kubectl get node -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
-  if [[ -z "$node_ip" ]]; then
-    node_ip="127.0.0.1"
-  fi
-
-  local firefox_address
-  if [[ -n "$firefox_node_port" ]]; then
-    firefox_address="http://${node_ip}:${firefox_node_port}/"
-  else
-    firefox_address="NodePort unavailable (inspect service tools/firefox)"
-  fi
-
   printf '\nAccess information:\n'
-  printf ' - Gitea UI:      Access via Firefox landing page (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
-  printf ' - Argo CD UI:    Access via Firefox landing page (admin user)\n'
+  printf ' - Gitea UI:      http://gitea-http.gitea.svc.cluster.local:3000/ (credentials %s / %s)\n' "$GITEA_USER" "$GITEA_PASSWORD"
+  printf ' - Argo CD UI:    https://argocd-server.argocd.svc.cluster.local/ (admin user)\n'
   printf ' - Argo CD gRPC:  In-cluster service argocd-server.argocd.svc.cluster.local:443\n'
   printf ' - Argo CD admin password: %s\n' "$argocd_password"
-  printf ' - NGINX example: Available via nginx-example.default.svc.cluster.local\n'
-  printf ' - Firefox (web): %s (password firefox)\n' "$firefox_address"
+  printf ' - NGINX example: http://nginx-example.default.svc.cluster.local/\n'
 }
 
 main "$@"

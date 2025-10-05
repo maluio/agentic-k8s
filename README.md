@@ -8,15 +8,12 @@ Agentic Kubernetes lab experiments live here. The repository focuses on deliveri
 ./scripts/bootstrap.sh
 ```
 
-Running the script on a Linux host with `systemd` provisions everything this lab expects. The bootstrap is idempotent—reruns skip work that’s already complete, refresh Helm releases, and keep the Firefox NodePort service configured. You may be prompted for `sudo` to install K3s.
+Running the script on a Linux host with `systemd` provisions everything this lab expects. The bootstrap is idempotent—reruns skip work that’s already complete and refresh Helm releases. You may be prompted for `sudo` to install K3s.
 
 After the script completes it prints:
-- Gitea credentials (`agentadmin / agentadmin123!`) for use via the Firefox landing page
-- Argo CD access details (the admin password is surfaced directly on the Firefox landing page so you can sign in immediately)
+- Gitea credentials (`agentadmin / agentadmin123!`) for use from in-cluster workflows
+- Argo CD access details (the admin password is surfaced directly in the summary so you can sign in immediately)
 - Confirmation that the sample nginx deployment is ready inside the cluster
-- A Firefox browser UI reachable on the NodePort the script prints (default `http://127.0.0.1:30800/`, password `firefox`) that opens a landing page of cluster links
-
-Firefox no longer relies on `kubectl port-forward`; the service is exposed via a dedicated NodePort so reconnecting only requires browsing to the printed address.
 
 ## What Bootstrap Installs
 
@@ -27,8 +24,6 @@ Firefox no longer relies on `kubectl port-forward`; the service is exposed via a
 - Sample `nginx-example` Helm chart deployment for quick smoke tests
 - A long-running `agent` utility pod equipped with Git and preloaded Gitea credentials for in-cluster workflows
 - A dedicated `agentic-k8s-charts` GitOps repository inside Gitea that Argo CD watches for chart updates
-- Browser UI (Firefox via jlesage) for accessing cluster services, including a sidecar-served landing page of useful links
-- Firefox NodePort service for the remote browser experience (other services are reachable via in-cluster DNS from that browser)
 
 That’s the entirety of the workflow—clone the repo, run `./scripts/bootstrap.sh`, and start building on the local cluster.
 
@@ -57,19 +52,8 @@ git commit -am "Describe your change"
 git push
 ```
 
-Argo CD automatically reconciles the Applications after the push. Watch the status with `kubectl -n argocd get applications.argoproj.io` or use the Firefox dashboard link. If you override the Gitea credentials when installing the chart, the pod regenerates the Git configuration on restart, so exec back in after an upgrade or rollout to pick up the new values.
+Argo CD automatically reconciles the Applications after the push. Watch the status with `kubectl -n argocd get applications.argoproj.io` or the Argo CD CLI/HTTP endpoint. If you override the Gitea credentials when installing the chart, the pod regenerates the Git configuration on restart, so exec back in after an upgrade or rollout to pick up the new values.
 
-### Firefox landing page
+### Accessing service endpoints
 
-The Firefox chart now ships with a sidecar that serves a lightweight HTML dashboard listing the endpoints the bootstrap process exposes (Gitea, Argo CD HTTP/gRPC, nginx example, Firefox, and any additional links you add). The default entries use in-cluster service hostnames so the remote Firefox session can reach them without port-forwards. Bootstrap also reads the Argo CD admin password and injects it into the dashboard so you can log in immediately; a copy-to-clipboard button avoids stray whitespace when you grab the value, and the tile still links the kubectl command in case you rotate the secret manually. The Firefox container is configured with `FF_OPEN_URL` so each browser session opens the dashboard first.
-
-To customize the page, supply your own values file when installing or updating the chart and override the `dashboard.links` array (each item supports `name`, `url`, and `description`). Use cluster DNS names for services you plan to open from the remote browser, or swap to NodePort or ingress URLs if you prefer to open them locally. You can also tweak the title, description text, and the sidecar image/port through the `dashboard` block. Example:
-
-```bash
-helm upgrade --install firefox charts/firefox \
-  --namespace tools \
-  --values charts/firefox/values.yaml \
-  --set dashboard.links[0].url=http://127.0.0.1:3000/
-```
-
-> Security note: The Argo CD password is displayed inside the cluster-bound Firefox session and the local NodePort that exposes it. That matches the assumptions for this single-user lab environment. If you rotate the password (for example with `kubectl -n argocd delete secret argocd-initial-admin-secret`) rerun `./scripts/bootstrap.sh` so the dashboard reflects the new value.
+Bootstrap now focuses on in-cluster workflows. Services expose cluster DNS names such as `http://gitea-http.gitea.svc.cluster.local:3000/` and `https://argocd-server.argocd.svc.cluster.local/`. Use the `agent` pod (or another in-cluster workload) to interact with those URLs directly. If you need local workstation access, layer on your preferred exposure mechanism (for example, create a temporary `kubectl port-forward` or configure a NodePort/Ingress in your own values override).

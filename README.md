@@ -15,6 +15,16 @@ After the script completes it prints:
 - Argo CD access details (the admin password is surfaced directly in the summary so you can sign in immediately)
 - Confirmation that the sample nginx deployment is ready inside the cluster
 
+### Reset the Cluster
+
+Need a clean slate? Run:
+
+```bash
+./scripts/reset.sh
+```
+
+The helper uninstalls K3s and removes your local `~/.kube/config` copy so the next bootstrap starts from scratch. You may be prompted for `sudo` to complete the reset.
+
 ## What Bootstrap Installs
 
 - [K3s](https://k3s.io/) single-node Kubernetes cluster

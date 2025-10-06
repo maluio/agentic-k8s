@@ -68,6 +68,19 @@ The bootstrap config seeds an admin account (`bn_user` / `GiteaRocks!123`) for f
 
 The bootstrap script writes a read-only kubeconfig to `agent/kubeconfig`. Use this configuration when you need to grant automation (or a human operator) inspect-only access to the cluster without risking mutating changes. The credentials are bound to a Kubernetes service account mapped to the built-in `view` ClusterRole.
 
+### Kubectl LLM Tool
+
+You can expose a safe kubectl wrapper to the [`llm`](https://llm.datasette.io/) CLI by pointing the `--functions` option at `tools/kubectl_llm.py` in this repository:
+
+```bash
+llm --functions tools/kubectl_llm.py \
+  --tools-approve \
+  --tools-debug \
+  "Use kubectl to get pods in the kube-system namespace and summarize the result."
+```
+
+The registered `kubectl(...)` tool shells out to the local `kubectl` binary, returning combined stdout/stderr to the model without raising exceptions. Only use this on trusted clusters: tool-enabled prompts can be abused by prompt-injection attacks, so keep `--tools-approve` enabled when experimenting and avoid supplying untrusted inputs.
+
 
 <!-- BOARD_START -->
 

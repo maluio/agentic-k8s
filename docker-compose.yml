@@ -1,0 +1,14 @@
+services:
+  agent:
+    build: .
+    container_name: agent
+    tty: true
+    stdin_open: true
+    network_mode: "host"
+    environment:
+      - SSH_AUTH_SOCK=/ssh-agent
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - KUBE_CONFIG=/workspace/agent/kubeconfig
+    volumes:
+      - .:/workspace
+      - ${SSH_AUTH_SOCK:-/tmp/ssh-agent}:/ssh-agent

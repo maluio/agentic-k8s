@@ -33,7 +33,7 @@ ensure_k3s() {
     add_summary "k3s already running"
   else
     log "Installing k3s (sudo required)..."
-    sudo "$REPO_ROOT/scripts/install-k3s.sh"
+    sudo "$REPO_ROOT/cluster/scripts/install-k3s.sh"
     add_summary "Installed k3s"
   fi
 }
@@ -44,7 +44,7 @@ ensure_kubectl() {
     add_summary "kubectl already present"
   else
     log "Installing kubectl..."
-    bash "$REPO_ROOT/scripts/install-kubectl.sh"
+    bash "$REPO_ROOT/cluster/scripts/install-kubectl.sh"
     add_summary "Installed kubectl"
   fi
 }

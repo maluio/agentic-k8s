@@ -135,9 +135,31 @@ EOF
     --serviceaccount="$namespace:$service_account" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-  local token
-  if ! token=$(kubectl create token "$service_account" --namespace "$namespace" 2>/dev/null | tr -d '\n'); then
-    log "WARNING: Unable to generate token for $namespace/$service_account; skipping kubeconfig output"
+  # Create a long-lived token secret for the service account
+  local token_secret="${service_account}-token"
+  kubectl apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $token_secret
+  namespace: $namespace
+  annotations:
+    kubernetes.io/service-account.name: $service_account
+type: kubernetes.io/service-account-token
+EOF
+
+  # Wait for the token to be populated
+  local token=""
+  for _ in {1..30}; do
+    token=$(kubectl get secret "$token_secret" -n "$namespace" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null | tr -d '\n' || true)
+    if [[ -n "$token" ]]; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ -z "$token" ]]; then
+    log "WARNING: Unable to retrieve token from secret $namespace/$token_secret; skipping kubeconfig output"
     return
   fi
 

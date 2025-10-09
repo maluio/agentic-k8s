@@ -222,9 +222,95 @@ def write_argocd(manifest_content: str) -> str:
     manifest_path = manifests_dir / f"{safe_app_name}.yaml"
     try:
         manifest_path.write_text(manifest_content)
-        return f"Successfully wrote ArgoCD manifest to {safe_app_name}.yaml"
     except OSError as exc:
         return f"Failed to write ArgoCD manifest '{safe_app_name}.yaml': {exc}"
+
+    # Git operations: commit and push the changes
+    # Working directory is /workspace (project root)
+    workspace_dir = Path("/workspace")
+    relative_path = f"agent/manifests/{safe_app_name}.yaml"
+
+    # Configure git user and safe directory if not already configured
+    git_config_commands = [
+        ["git", "config", "--global", "user.name", "k8s-agent"],
+        ["git", "config", "--global", "user.email", "k8s-agent@localhost"],
+        ["git", "config", "--global", "--add", "safe.directory", "/workspace"],
+    ]
+
+    for cmd in git_config_commands:
+        try:
+            subprocess.run(
+                cmd,
+                cwd=workspace_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except Exception:
+            pass  # Ignore config errors, continue with git operations
+
+    # Git add
+    try:
+        result = subprocess.run(
+            ["git", "add", relative_path],
+            cwd=workspace_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return (
+                f"Successfully wrote {safe_app_name}.yaml but git add failed: "
+                f"{result.stderr or result.stdout}"
+            )
+    except Exception as exc:
+        return f"Successfully wrote {safe_app_name}.yaml but git add failed: {exc}"
+
+    # Git commit
+    commit_message = f"Add/update ArgoCD manifest for {safe_app_name}"
+    try:
+        result = subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            cwd=workspace_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            # Check if it's because there are no changes to commit
+            if "nothing to commit" in result.stdout or "nothing to commit" in result.stderr:
+                return f"ArgoCD manifest {safe_app_name}.yaml already up to date (no changes to commit)"
+            return (
+                f"Successfully wrote {safe_app_name}.yaml but git commit failed: "
+                f"{result.stderr or result.stdout}"
+            )
+    except Exception as exc:
+        return f"Successfully wrote {safe_app_name}.yaml but git commit failed: {exc}"
+
+    # Git push
+    try:
+        result = subprocess.run(
+            ["git", "push"],
+            cwd=workspace_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return (
+                f"Successfully wrote and committed {safe_app_name}.yaml but git push failed: "
+                f"{result.stderr or result.stdout}"
+            )
+    except subprocess.TimeoutExpired:
+        return f"Successfully wrote and committed {safe_app_name}.yaml but git push timed out"
+    except Exception as exc:
+        return f"Successfully wrote and committed {safe_app_name}.yaml but git push failed: {exc}"
+
+    return (
+        f"Successfully wrote ArgoCD manifest to {safe_app_name}.yaml, "
+        f"committed and pushed to repository"
+    )
 
 
 __all__ = ["kubectl", "read_argocd", "write_argocd"]

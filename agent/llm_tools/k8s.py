@@ -12,6 +12,7 @@ so the model can react accordingly.
 
 import shlex
 import subprocess
+from pathlib import Path
 def kubectl(
     command: str,
     namespace: str | None = None,
@@ -82,4 +83,59 @@ def kubectl(
     return "\n".join(part for part in output_parts if part) or "(no output)"
 
 
-__all__ = ["kubectl"]
+def read_argocd(argocd_app_name: str) -> str:
+    """Read an ArgoCD application manifest from the agent/manifests directory.
+
+    This function reads ArgoCD application YAML files stored locally in the
+    agent/manifests directory. The naming convention is that the ArgoCD
+    application name corresponds directly to the YAML filename.
+
+    Parameters
+    ----------
+    argocd_app_name:
+        The name of the ArgoCD application. This should match the filename
+        (without extension) in agent/manifests/. For example, if the app name
+        is "nginx-example", the function will look for either
+        "nginx-example.yaml" or "nginx-example.yml".
+
+    Returns
+    -------
+    str
+        The contents of the YAML manifest file, or an error message if the
+        file is not found or cannot be read.
+
+    Examples
+    --------
+    >>> read_argocd("nginx-example")
+    'apiVersion: argoproj.io/v1alpha1\\nkind: Application\\n...'
+
+    >>> read_argocd("non-existent-app")
+    'ArgoCD manifest not found: non-existent-app...'
+    """
+    # This function runs inside the agent Docker container where paths are predictable
+    # The manifests directory is always at /workspace/agent/manifests
+    manifests_dir = Path("/workspace/agent/manifests")
+
+    if not manifests_dir.exists():
+        return (
+            f"Manifests directory not found at {manifests_dir}. "
+            f"Ensure the container has the correct volume mounts."
+        )
+
+    # Try both .yaml and .yml extensions
+    for extension in [".yaml", ".yml"]:
+        manifest_path = manifests_dir / f"{argocd_app_name}{extension}"
+        if manifest_path.exists():
+            try:
+                return manifest_path.read_text()
+            except OSError as exc:
+                return f"Failed to read ArgoCD manifest '{argocd_app_name}': {exc}"
+
+    # If we get here, the file wasn't found with either extension
+    return (
+        f"ArgoCD manifest not found: {argocd_app_name}\n"
+        f"Looked for {argocd_app_name}.yaml or {argocd_app_name}.yml in {manifests_dir}"
+    )
+
+
+__all__ = ["kubectl", "read_argocd"]

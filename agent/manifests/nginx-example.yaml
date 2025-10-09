@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-example
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: nginx
+    targetRevision: 15.14.1  # latest stable version as of Oct 2025
+    helm:
+      releaseName: nginx-example
+      values: |
+        service:
+          type: ClusterIP  # Change to LoadBalancer if external access is needed
+        replicaCount: 3  # Increased for better availability
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nginx-example
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

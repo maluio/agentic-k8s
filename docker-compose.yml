@@ -8,7 +8,7 @@ services:
     environment:
       - SSH_AUTH_SOCK=/ssh-agent
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - KUBE_CONFIG=/workspace/agent/kubeconfig
+      - KUBECONFIG=/workspace/agent/kubeconfig
     volumes:
       - .:/workspace
       - ${SSH_AUTH_SOCK:-/tmp/ssh-agent}:/ssh-agent

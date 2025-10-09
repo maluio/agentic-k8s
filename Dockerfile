@@ -14,6 +14,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN uv tool install llm
 
+# Install Python packages for LLM tools
+RUN pip install --no-cache-dir pyyaml
+
 # Install kubectl
 RUN curl -fsSL https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
     && chmod +x /usr/local/bin/kubectl

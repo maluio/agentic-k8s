@@ -13,6 +13,8 @@ so the model can react accordingly.
 import shlex
 import subprocess
 from pathlib import Path
+
+import yaml
 def kubectl(
     command: str,
     namespace: str | None = None,
@@ -138,4 +140,91 @@ def read_argocd(argocd_app_name: str) -> str:
     )
 
 
-__all__ = ["kubectl", "read_argocd"]
+def write_argocd(manifest_content: str) -> str:
+    """Write an ArgoCD application manifest to the agent/manifests directory.
+
+    This function writes ArgoCD application YAML manifests to the local
+    agent/manifests directory. It parses the YAML to extract the application
+    name from metadata.name and uses that as the filename.
+
+    Parameters
+    ----------
+    manifest_content:
+        The complete YAML content of the ArgoCD application manifest as a
+        string. Must be valid YAML with metadata.name field.
+
+    Returns
+    -------
+    str
+        Success message with the written filename, or an error message if
+        the write operation fails or the YAML is invalid.
+
+    Examples
+    --------
+    >>> manifest = '''
+    ... apiVersion: argoproj.io/v1alpha1
+    ... kind: Application
+    ... metadata:
+    ...   name: my-app
+    ...   namespace: argocd
+    ... spec:
+    ...   project: default
+    ... '''
+    >>> write_argocd(manifest)
+    'Successfully wrote ArgoCD manifest to my-app.yaml'
+
+    >>> write_argocd("invalid: yaml: content:")
+    'Failed to parse YAML manifest: ...'
+    """
+    # This function runs inside the agent Docker container where paths are predictable
+    # The manifests directory is always at /workspace/agent/manifests
+    manifests_dir = Path("/workspace/agent/manifests")
+
+    if not manifests_dir.exists():
+        return (
+            f"Manifests directory not found at {manifests_dir}. "
+            f"Ensure the container has the correct volume mounts."
+        )
+
+    # Parse and validate the YAML
+    try:
+        manifest_data = yaml.safe_load(manifest_content)
+    except yaml.YAMLError as exc:
+        return f"Failed to parse YAML manifest: {exc}"
+
+    # Validate that it's a dict with metadata
+    if not isinstance(manifest_data, dict):
+        return "Invalid manifest: YAML must be a dictionary/object"
+
+    if "metadata" not in manifest_data:
+        return "Invalid manifest: missing 'metadata' field"
+
+    if not isinstance(manifest_data["metadata"], dict):
+        return "Invalid manifest: 'metadata' must be a dictionary/object"
+
+    if "name" not in manifest_data["metadata"]:
+        return "Invalid manifest: missing 'metadata.name' field"
+
+    # Extract the application name
+    app_name = manifest_data["metadata"]["name"]
+    if not app_name or not isinstance(app_name, str):
+        return f"Invalid manifest: 'metadata.name' must be a non-empty string, got: {app_name}"
+
+    # Sanitize the filename (remove path separators and other unsafe characters)
+    safe_app_name = app_name.replace("/", "-").replace("\\", "-").replace("..", "")
+    if safe_app_name != app_name:
+        return (
+            f"Invalid application name '{app_name}': "
+            f"name contains unsafe characters. Use alphanumeric, dash, or underscore only."
+        )
+
+    # Write the manifest file
+    manifest_path = manifests_dir / f"{safe_app_name}.yaml"
+    try:
+        manifest_path.write_text(manifest_content)
+        return f"Successfully wrote ArgoCD manifest to {safe_app_name}.yaml"
+    except OSError as exc:
+        return f"Failed to write ArgoCD manifest '{safe_app_name}.yaml': {exc}"
+
+
+__all__ = ["kubectl", "read_argocd", "write_argocd"]

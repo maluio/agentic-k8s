@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://charts.bitnami.com/bitnami
     chart: nginx
-    targetRevision: 15.14.1  # latest stable version as of Oct 2025
+    targetRevision: "<16.0.0"  # track latest 15.x
     helm:
       releaseName: nginx-example
       values: |

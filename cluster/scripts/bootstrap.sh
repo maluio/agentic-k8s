@@ -239,6 +239,44 @@ install_argocd() {
   wait_for_statefulset argocd argocd-application-controller || true
 }
 
+create_agent_root_application() {
+  log "Creating k8s-agent-root ArgoCD application"
+
+  kubectl apply -f - >/dev/null <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-agent-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/maluio/agentic-k8s
+    targetRevision: main
+    path: agent/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy: {}
+EOF
+
+  # Wait for the application to be created
+  local app_exists=""
+  for _ in {1..30}; do
+    app_exists=$(kubectl get application k8s-agent-root -n argocd --no-headers 2>/dev/null || true)
+    if [[ -n "$app_exists" ]]; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ -n "$app_exists" ]]; then
+    add_summary "Created k8s-agent-root ArgoCD application"
+  else
+    log "WARNING: k8s-agent-root application creation timeout"
+  fi
+}
+
 main() {
   cd "$REPO_ROOT"
 
@@ -248,6 +286,7 @@ main() {
   ensure_kubectl
   wait_for_nodes
   install_argocd
+  create_agent_root_application
   ensure_agent_kubeconfig
   ensure_argocd_nodeport
 

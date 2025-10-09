@@ -26,17 +26,9 @@ docker compose exec agent bash
 Inside the container, use the `llm` command with the k8s.py functions:
 
 ```bash
-# Create a new ArgoCD application manifest
-llm --functions /workspace/agent/llm_tools/k8s.py \
-  'create an argocd application for postgresql using bitnami chart version 15.5.0'
 
-# Read an existing manifest
-llm --functions /workspace/agent/llm_tools/k8s.py \
-  'read the nginx-example manifest and show me the chart version'
-
-# Update a manifest
-llm --functions /workspace/agent/llm_tools/k8s.py \
-  'update the redis manifest to use version 20.6.0'
+# Use the k8s-agent template and funtions, set chain-limit to unlimit tool calls
+llm chat -t k8s-agent --functions agent/llm_tools/k8s.py --chain-limit 0
 ```
 
 The `write_argocd` function automatically:

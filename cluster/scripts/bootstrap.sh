@@ -99,7 +99,8 @@ ensure_agent_kubeconfig() {
   local agent_dir="$REPO_ROOT/agent"
   local namespace="default"
   local service_account="agent-readonly"
-  local clusterrolebinding="agent-readonly-view"
+  local clusterrole="agent-readonly-all"
+  local clusterrolebinding="agent-readonly-all-binding"
   local kubeconfig_path="$agent_dir/kubeconfig"
 
   log "Preparing read-only kubeconfig for agent workflows"
@@ -109,8 +110,28 @@ ensure_agent_kubeconfig() {
     --namespace "$namespace" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+  # Create a comprehensive read-only ClusterRole with access to all resources including CRDs
+  kubectl apply -f - >/dev/null <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: $clusterrole
+rules:
+  # Read access to all standard API resources
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Read access to all resource statuses
+  - apiGroups: ["*"]
+    resources: ["*/status"]
+    verbs: ["get", "list", "watch"]
+  # Read access to non-resource URLs (e.g., /healthz, /metrics)
+  - nonResourceURLs: ["*"]
+    verbs: ["get"]
+EOF
+
   kubectl create clusterrolebinding "$clusterrolebinding" \
-    --clusterrole=view \
+    --clusterrole="$clusterrole" \
     --serviceaccount="$namespace:$service_account" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 

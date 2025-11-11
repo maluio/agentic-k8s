@@ -1,8 +1,8 @@
 # Agentic K8S Experiment
 
-An experiment to manage a Kubernetes cluster through a llm chat interface.
+An experiment to manage a Kubernetes cluster through a LLM chat interface.
 
-* The bootstrap scripts install ...
+* The bootstrap scripts installs ...
   * a k3s single node Kubernetes "cluster"
   * ArgoCD running in that cluster
   * A `k8s-agent-root` ArgoCD application that manages child applications
@@ -11,7 +11,7 @@ An experiment to manage a Kubernetes cluster through a llm chat interface.
 
 ## Prerequisites
 
-* a Linux VM (tested with Ubuntu 24.04 as guest os)
+* a Linux VM (tested with Ubuntu 24.04 as guest OS)
 * Docker running in the VM
 * an OpenAI API key
 
@@ -38,7 +38,7 @@ The bootstrap script (`cluster/scripts/bootstrap.sh`) installs:
 
 ```bash
 export OPENAI_API_KEY=<your key>
-docker compose up -d
+  docker compose up -d
 docker compose exec agent bash
 ```
 

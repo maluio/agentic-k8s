@@ -31,3 +31,10 @@ This config connects Claude Desktop to the VM via SSH, runs the MCP server in ST
 ![alt text](claude_desktop.png)
 
 Why via SSH? Kubernetes MCP Server supports running as a remote server but it's cumbersome to connect Claude Desktop to a MCP.
+
+**Follow logs in real-time**
+
+```bash
+# With Claude Desktop running on MacOS
+tail -n 20 -F ~/Library/Logs/Claude/mcp*.log
+```

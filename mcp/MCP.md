@@ -38,3 +38,10 @@ Why via SSH? Kubernetes MCP Server supports running as a remote server but it's 
 # With Claude Desktop running on MacOS
 tail -n 20 -F ~/Library/Logs/Claude/mcp*.log
 ```
+
+### Using Claude Code as MCP client
+
+```bash
+claude mcp add --transport stdio kubernetes -- uvx kubernetes-mcp-server
+```
+

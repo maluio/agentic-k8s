@@ -2,101 +2,63 @@
 #
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["httpx", "mcp[cli]"]
+# dependencies = ["mcp[cli]", "kubernetes"]
 # ///
 
 # From https://modelcontextprotocol.io/docs/develop/build-server
 
 from typing import Any
-import httpx
 from mcp.server.fastmcp import FastMCP
+from kubernetes import client, config
+import json
 
 # Initialize FastMCP server
-mcp = FastMCP("weather")
-
-# Constants
-NWS_API_BASE = "https://api.weather.gov"
-USER_AGENT = "weather-app/1.0"
-
-async def make_nws_request(url: str) -> dict[str, Any] | None:
-    """Make a request to the NWS API with proper error handling."""
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "application/geo+json"
-    }
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(url, headers=headers, timeout=30.0)
-            response.raise_for_status()
-            return response.json()
-        except Exception:
-            return None
-
-def format_alert(feature: dict) -> str:
-    """Format an alert feature into a readable string."""
-    props = feature["properties"]
-    return f"""
-Event: {props.get('event', 'Unknown')}
-Area: {props.get('areaDesc', 'Unknown')}
-Severity: {props.get('severity', 'Unknown')}
-Description: {props.get('description', 'No description available')}
-Instructions: {props.get('instruction', 'No specific instructions provided')}
-"""
+mcp = FastMCP("kubernetes")
 
 @mcp.tool()
-async def get_alerts(state: str) -> str:
-    """Get weather alerts for a US state.
+async def get_pods(namespace: str) -> str:
+    """Get pods for a given namespace.
 
     Args:
-        state: Two-letter US state code (e.g. CA, NY)
+        namespace: The Kubernetes namespace
     """
-    url = f"{NWS_API_BASE}/alerts/active/area/{state}"
-    data = await make_nws_request(url)
+    try:
+        # Load kubernetes configuration
+        config.load_kube_config()
 
-    if not data or "features" not in data:
-        return "Unable to fetch alerts or no alerts found."
+        # Create API client
+        v1 = client.CoreV1Api()
 
-    if not data["features"]:
-        return "No active alerts for this state."
+        # List pods in the namespace
+        pods = v1.list_namespaced_pod(namespace=namespace)
 
-    alerts = [format_alert(feature) for feature in data["features"]]
-    return "\n---\n".join(alerts)
+        # Format the response
+        pod_list = []
+        for pod in pods.items:
+            pod_info = {
+                "name": pod.metadata.name,
+                "namespace": pod.metadata.namespace,
+                "status": pod.status.phase,
+                "ip": pod.status.pod_ip,
+                "node": pod.spec.node_name,
+                "containers": [
+                    {
+                        "name": container.name,
+                        "image": container.image,
+                        "ready": any(
+                            cs.name == container.name and cs.ready
+                            for cs in (pod.status.container_statuses or [])
+                        )
+                    }
+                    for container in pod.spec.containers
+                ]
+            }
+            pod_list.append(pod_info)
 
-@mcp.tool()
-async def get_forecast(latitude: float, longitude: float) -> str:
-    """Get weather forecast for a location.
+        return json.dumps(pod_list, indent=2)
 
-    Args:
-        latitude: Latitude of the location
-        longitude: Longitude of the location
-    """
-    # First get the forecast grid endpoint
-    points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
-    points_data = await make_nws_request(points_url)
-
-    if not points_data:
-        return "Unable to fetch forecast data for this location."
-
-    # Get the forecast URL from the points response
-    forecast_url = points_data["properties"]["forecast"]
-    forecast_data = await make_nws_request(forecast_url)
-
-    if not forecast_data:
-        return "Unable to fetch detailed forecast."
-
-    # Format the periods into a readable forecast
-    periods = forecast_data["properties"]["periods"]
-    forecasts = []
-    for period in periods[:5]:  # Only show next 5 periods
-        forecast = f"""
-{period['name']}:
-Temperature: {period['temperature']}°{period['temperatureUnit']}
-Wind: {period['windSpeed']} {period['windDirection']}
-Forecast: {period['detailedForecast']}
-"""
-        forecasts.append(forecast)
-
-    return "\n---\n".join(forecasts)
+    except Exception as e:
+        return f"Error getting pods: {str(e)}"
 
 def main():
     # Initialize and run the server

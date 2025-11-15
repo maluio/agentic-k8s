@@ -86,17 +86,17 @@ def kubectl(
 
 
 def read_argocd(argocd_app_name: str) -> str:
-    """Read an ArgoCD application manifest from the agent/manifests directory.
+    """Read an ArgoCD application manifest from the /manifests directory.
 
     This function reads ArgoCD application YAML files stored locally in the
-    agent/manifests directory. The naming convention is that the ArgoCD
+    /manifests directory. The naming convention is that the ArgoCD
     application name corresponds directly to the YAML filename.
 
     Parameters
     ----------
     argocd_app_name:
         The name of the ArgoCD application. This should match the filename
-        (without extension) in agent/manifests/. For example, if the app name
+        (without extension) in /manifests/. For example, if the app name
         is "nginx-example", the function will look for either
         "nginx-example.yaml" or "nginx-example.yml".
 
@@ -115,8 +115,8 @@ def read_argocd(argocd_app_name: str) -> str:
     'ArgoCD manifest not found: non-existent-app...'
     """
     # This function runs inside the agent Docker container where paths are predictable
-    # The manifests directory is always at /workspace/agent/manifests
-    manifests_dir = Path("/workspace/agent/manifests")
+    # The manifests directory is always at /manifests
+    manifests_dir = Path("/manifests")
 
     if not manifests_dir.exists():
         return (
@@ -141,10 +141,10 @@ def read_argocd(argocd_app_name: str) -> str:
 
 
 def write_argocd(manifest_content: str) -> str:
-    """Write an ArgoCD application manifest to the agent/manifests directory.
+    """Write an ArgoCD application manifest to the /manifests directory.
 
     This function writes ArgoCD application YAML manifests to the local
-    agent/manifests directory. It parses the YAML to extract the application
+    /manifests directory. It parses the YAML to extract the application
     name from metadata.name and uses that as the filename.
 
     Parameters
@@ -177,8 +177,8 @@ def write_argocd(manifest_content: str) -> str:
     'Failed to parse YAML manifest: ...'
     """
     # This function runs inside the agent Docker container where paths are predictable
-    # The manifests directory is always at /workspace/agent/manifests
-    manifests_dir = Path("/workspace/agent/manifests")
+    # The manifests directory is always at /manifests
+    manifests_dir = Path("/manifests")
 
     if not manifests_dir.exists():
         return (
@@ -226,9 +226,9 @@ def write_argocd(manifest_content: str) -> str:
         return f"Failed to write ArgoCD manifest '{safe_app_name}.yaml': {exc}"
 
     # Git operations: commit and push the changes
-    # Working directory is /workspace (project root)
-    workspace_dir = Path("/workspace")
-    relative_path = f"agent/manifests/{safe_app_name}.yaml"
+    # Working directory is the manifests directory
+    workspace_dir = Path("/manifests")
+    relative_path = f"{safe_app_name}.yaml"
 
     # Configure git user and safe directory if not already configured
     git_config_commands = [

@@ -96,15 +96,15 @@ wait_for_statefulset() {
 }
 
 ensure_agent_kubeconfig() {
-  local agent_dir="$REPO_ROOT/agent"
   local namespace="default"
   local service_account="agent-readonly"
   local clusterrole="agent-readonly-all"
   local clusterrolebinding="agent-readonly-all-binding"
-  local kubeconfig_path="$agent_dir/kubeconfig"
+  local kubeconfig_dir="$REPO_ROOT/cluster/kubeconfig"
+  local kubeconfig_path="$kubeconfig_dir/agent.yml"
 
   log "Preparing read-only kubeconfig for agent workflows"
-  mkdir -p "$agent_dir"
+  mkdir -p "$kubeconfig_dir"
 
   kubectl create serviceaccount "$service_account" \
     --namespace "$namespace" \
@@ -205,7 +205,7 @@ users:
 EOF
 
   chmod 600 "$kubeconfig_path" || true
-  add_summary "Generated read-only kubeconfig at agent/kubeconfig"
+  add_summary "Generated read-only kubeconfig at $kubeconfig_path"
 }
 
 ensure_argocd_nodeport() {
@@ -275,7 +275,7 @@ spec:
   source:
     repoURL: https://github.com/maluio/agentic-k8s
     targetRevision: main
-    path: agent/manifests
+    path: cluster/argocd/manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -352,7 +352,7 @@ main() {
   else
     printf ' - Gitea NodePort: http://%s:%s\n' "$node_ip" "<unknown>"
   fi
-  printf ' - Agent kubeconfig (read-only): %s\n' "$REPO_ROOT/agent/kubeconfig"
+  printf ' - Agent kubeconfig (read-only): %s\n' "$REPO_ROOT/cluster/kubeconfig"
 }
 
 main "$@"

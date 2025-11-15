@@ -8,8 +8,10 @@ services:
     environment:
       - SSH_AUTH_SOCK=/ssh-agent
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - KUBECONFIG=/workspace/agent/kubeconfig
-      - LLM_USER_PATH=/workspace/agent/llm_config
+      - KUBECONFIG=/kubeconfig
+      - LLM_USER_PATH=/workspace/llm_config
     volumes:
-      - .:/workspace
+      - ../cluster/kubeconfig/agent.yml:/kubeconfig
+      - ../cluster/argocd/manifests:/manifests
+      - ./:/workspace
       - ${SSH_AUTH_SOCK:-/tmp/ssh-agent}:/ssh-agent

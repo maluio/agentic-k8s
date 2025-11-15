@@ -19,6 +19,8 @@ The bootstrap script (`cluster/scripts/bootstrap.sh`) installs:
 
 - k3s Kubernetes cluster
 - kubectl CLI
+- helm (Kubernetes package manager)
+- k9s (terminal UI for Kubernetes)
 - ArgoCD
 - Read-only kubeconfig for agentic workflows
 - `k8s-agent-root` ArgoCD application (watches `cluster/argocd/manifests/`)

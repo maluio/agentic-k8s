@@ -191,6 +191,11 @@ main() {
 
   ensure_k3s
   ensure_kubectl
+
+  log "Installing additional tools (helm, k9s)"
+  bash "$REPO_ROOT/cluster/scripts/install-tools.sh"
+  add_summary "Installed additional tools (helm, k9s)"
+
   wait_for_nodes
   ensure_agent_kubeconfig
 

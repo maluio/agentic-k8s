@@ -1,0 +1,4 @@
+.terraform
+*.tfstate
+k3s_kustomization_backup.yaml
+k3s_kubeconfig.yaml

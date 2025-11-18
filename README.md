@@ -31,3 +31,5 @@ The bootstrap script (`cluster/scripts/bootstrap.sh`) installs:
 * [Using the LLM python cli to manage ArgoCD manifests](./llm-py/README.md)
 * [Playing with MCP server and clients](./mcp/README.md)
 * [Playing with kagent](./kagent/README.md)
+  * [Creating custom kagent agents](./kagent/agents/README.md)
+

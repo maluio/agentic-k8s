@@ -122,7 +122,7 @@ module "kube-hetzner" {
   control_plane_nodepools = [
     {
       name        = "control-plane-fsn1",
-      server_type = "cx32",
+      server_type = "cx33",
       location    = "fsn1",
       labels      = [],
       taints      = [],
@@ -148,7 +148,7 @@ module "kube-hetzner" {
   agent_nodepools = [
     {
       name        = "agent-small",
-      server_type = "cx32",
+      server_type = "cx33",
       location    = "fsn1",
       labels      = [],
       taints      = [],

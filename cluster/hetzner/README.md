@@ -27,3 +27,8 @@ terraform init --upgrade
 terraform validate
 terraform apply -auto-approve
 ```
+
+```bash
+# Since we are in a disposable environment, just copy the kube config
+cp k3s_kubeconfig.yaml ~/.kube/config
+```

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kagent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    chart: kagent
+    repoURL: ghcr.io/kagent-dev/kagent/helm
+    targetRevision: 0.7.4  # Update to desired version
+    helm:
+      values: |
+        providers:
+          default: openAI
+          openAI:
+            # References a Kubernetes secret for the API key
+            # The secret must be created before deploying this application
+            # Default values: secretRef=kagent-openai, secretKey=OPENAI_API_KEY
+            apiKeySecretRef: kagent-openai
+            apiKeySecretKey: OPENAI_API_KEY
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kagent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -30,3 +30,7 @@ kubectl get svc argocd-server -n argocd -o=jsonpath='{.status.loadBalancer.ingre
 ```
 
 This deploys a bunch of agents. Run `kagent dashboard` and test one of the agents from the ui.
+
+For example, this is using the k8s-agent to check recent k8s events:
+
+![k8s-agent event check](./assets/k8s-agent-check.png)

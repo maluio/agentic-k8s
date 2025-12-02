@@ -5,13 +5,18 @@
 ## Installation
 
 ```bash
+# installing the kagent cli
 curl https://raw.githubusercontent.com/kagent-dev/kagent/refs/heads/main/scripts/get-kagent | bash
 ```
 
+### Option 1: Installing kagent using the kagent cli
+
 ```bash
 export OPENAI_API_KEY=<key>
-kagent install
+kagent install -n kagent
 ```
+
+### Option 2: Installing kagent using ArgoCD
 
 ```bash
 # install argocd
@@ -29,8 +34,17 @@ kubectl get svc argocd-server -n argocd -o=jsonpath='{.status.loadBalancer.ingre
 ./argocd/deploy.sh
 ```
 
-This deploys a bunch of agents. Run `kagent dashboard` and test one of the agents from the ui.
+## Using kagent
 
-For example, this is using the k8s-agent to check recent k8s events:
+Once installation is finished run either `kagent` for the TUI or `kagent dashboard` for a web ui test one of the agents.
+
+![k8s-agent namespaces](./assets/k8s-namespaces.png)
 
 ![k8s-agent event check](./assets/k8s-agent-check.png)
+
+
+## Installing custom agents
+
+`kubectl apply -f` any of the [agent manifests](./agents/)
+
+(There is also `kagent deploy` but for this experiment `kubectl` is fine)

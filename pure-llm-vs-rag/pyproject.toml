@@ -1,0 +1,16 @@
+[project]
+name = "pure-llm-vs-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain>=1.1.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-community>=0.3.0",
+    "chromadb>=0.4.0",
+    "unstructured[md]>=0.10.0",
+    "langchain-qdrant>=1.1.0",
+    "click>=8.3.1",
+]

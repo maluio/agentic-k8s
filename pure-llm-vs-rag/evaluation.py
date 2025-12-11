@@ -112,10 +112,11 @@ def run(docs_path, tag, skip_index, chunk_size, chunk_overlap, recreate_index,
     click.echo('='*80)
 
     # Generate timestamped filename if output not specified
+    run_timestamp = datetime.now()
     if output is None:
         # Create evaluations directory if it doesn't exist
         os.makedirs("./evaluations", exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
+        timestamp = run_timestamp.strftime("%Y-%m-%d-%H-%M")
         output = f"./evaluations/evaluation-{timestamp}.json"
 
     # Parse models
@@ -241,10 +242,32 @@ def run(docs_path, tag, skip_index, chunk_size, chunk_overlap, recreate_index,
 
         all_results[q] = results
 
-    # Save results if output specified
+    # Save results with parameters
     if output:
+        output_data = {
+            "metadata": {
+                "timestamp": run_timestamp.isoformat(),
+                "parameters": {
+                    "docs_path": docs_path,
+                    "tag": tag,
+                    "skip_index": skip_index,
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "recreate_index": recreate_index,
+                    "collection_name": collection_name,
+                    "qdrant_url": qdrant_url,
+                    "models": models,
+                    "retriever_k": retriever_k,
+                    "mode": mode,
+                    "show_context": show_context,
+                    "output": output,
+                    "questions_count": len(questions)
+                }
+            },
+            "results": all_results
+        }
         with open(output, 'w') as f:
-            json.dump(all_results, f, indent=2)
+            json.dump(output_data, f, indent=2)
         click.echo(f"\n✓ Results saved to {output}")
 
 

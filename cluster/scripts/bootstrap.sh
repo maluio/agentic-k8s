@@ -25,14 +25,33 @@ require_command() {
   fi
 }
 
-ensure_k3s() {
-  if systemctl is-active --quiet k3s; then
-    log "k3s service already active"
-    add_summary "k3s already running"
+ensure_kind() {
+  if ! command -v docker >/dev/null 2>&1; then
+    log "ERROR: docker is required for kind but not found on PATH"
+    exit 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    log "ERROR: docker daemon is not running"
+    exit 1
+  fi
+
+  if command -v kind >/dev/null 2>&1; then
+    log "kind already installed"
   else
-    log "Installing k3s (sudo required)..."
-    sudo "$REPO_ROOT/cluster/scripts/install-k3s.sh"
-    add_summary "Installed k3s"
+    log "Installing kind..."
+    bash "$REPO_ROOT/cluster/scripts/install-kind.sh"
+    add_summary "Installed kind"
+  fi
+
+  local cluster_name="agentic-k8s"
+  if kind get clusters 2>/dev/null | grep -q "^${cluster_name}$"; then
+    log "kind cluster '${cluster_name}' already exists"
+    add_summary "kind cluster already running"
+  else
+    log "Creating kind cluster '${cluster_name}'..."
+    kind create cluster --name "$cluster_name"
+    add_summary "Created kind cluster"
   fi
 }
 
@@ -189,7 +208,7 @@ main() {
 
   require_command sudo
 
-  ensure_k3s
+  ensure_kind
   ensure_kubectl
 
   log "Installing additional tools (helm, k9s)"

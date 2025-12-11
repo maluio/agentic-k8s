@@ -17,7 +17,7 @@
 
 The bootstrap script (`cluster/scripts/bootstrap.sh`) installs:
 
-- k3s Kubernetes cluster
+- kind Kubernetes cluster
 - kubectl CLI
 - helm (Kubernetes package manager)
 - k9s (terminal UI for Kubernetes)

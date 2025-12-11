@@ -10,6 +10,10 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pathlib import Path
 import json
+import subprocess
+import os
+
+K8S_DOCS_PATH = 'k8s-docs'
 
 
 @click.group()
@@ -18,9 +22,80 @@ def cli():
     pass
 
 
+@cli.group()
+def docs():
+    """Manage Kubernetes documentation."""
+    pass
+
+
+@docs.command()
+@click.option('--docs-path', default=K8S_DOCS_PATH, help='Directory to clone the repository into')
+@click.option('--tag', help='Git tag to checkout after cloning')
+def get(docs_path, tag):
+    """Clone the Kubernetes website repository."""
+    repo_url = "https://github.com/kubernetes/website.git"
+
+    try:
+        if os.path.exists(docs_path):
+            click.echo(f"Directory '{docs_path}' already exists. Skipping clone.")
+            if tag:
+                click.echo(f"Checking out tag '{tag}'...")
+                subprocess.run(['git', '-C', docs_path, 'checkout', f'tags/{tag}'], check=True)
+                click.echo(f"✓ Checked out tag '{tag}'")
+        else:
+            click.echo(f"Cloning {repo_url} into {docs_path}...")
+            subprocess.run(['git', 'clone', repo_url, docs_path], check=True)
+            click.echo(f"✓ Successfully cloned Kubernetes documentation to {docs_path}")
+
+            if tag:
+                click.echo(f"Checking out tag '{tag}'...")
+                subprocess.run(['git', '-C', docs_path, 'checkout', f'tags/{tag}'], check=True)
+                click.echo(f"✓ Checked out tag '{tag}'")
+    except subprocess.CalledProcessError as e:
+        click.echo(f"Error: Git operation failed: {e}", err=True)
+        raise click.Abort()
+
+
+@docs.command()
+def tags():
+    """List available tags from the Kubernetes website repository."""
+    repo_url = "https://github.com/kubernetes/website.git"
+
+    click.echo(f"Fetching tags from {repo_url}...")
+    try:
+        result = subprocess.run(
+            ['git', 'ls-remote', '--tags', '--sort=-v:refname', repo_url],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+
+        tags = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                # Extract tag name from refs/tags/...
+                parts = line.split('refs/tags/')
+                if len(parts) > 1:
+                    tag_name = parts[1].replace('^{}', '')  # Remove ^{} suffix for annotated tags
+                    if tag_name not in tags and tag_name.startswith('snapshot-initial-'):  # Filter for release- tags
+                        tags.append(tag_name)
+
+        click.echo(f"\nAvailable release tags ({len(tags)} total):")
+        for tag in tags[:50]:  # Show first 50 tags
+            click.echo(f"  {tag}")
+
+        if len(tags) > 50:
+            click.echo(f"\n... and {len(tags) - 50} more tags")
+            click.echo("Use 'python evaluation.py docs get --tag <tag-name>' to clone a specific version")
+
+    except subprocess.CalledProcessError as e:
+        click.echo(f"Error: Failed to fetch tags: {e}", err=True)
+        raise click.Abort()
+
+
 @cli.command()
-@click.option('--docs-path',
-              help='Path to K8s documentation directory')
+@click.option('--docs-path', default=f"{K8S_DOCS_PATH}/content/en/docs/concepts/containers",
+              help='Path to K8s documentation directory', type=click.Path())
 @click.option('--collection-name', default="k8s_docs", help='Qdrant collection name')
 @click.option('--qdrant-url', default="http://localhost:6333", help='Qdrant server URL')
 @click.option('--chunk-size', default=1000, help='Text chunk size for splitting')

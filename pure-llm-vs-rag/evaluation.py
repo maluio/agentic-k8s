@@ -1,6 +1,5 @@
 import click
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
@@ -27,7 +26,7 @@ K8S_DOCS_PATH = 'k8s-docs'
 @click.option('--recreate-index/--no-recreate-index', default=True, help='Recreate collection if exists')
 @click.option('--collection-name', default="k8s_docs", help='Qdrant collection name')
 @click.option('--qdrant-url', default="http://localhost:6333", help='Qdrant server URL')
-@click.option('--models', default="gpt-5-nano", help='Comma-separated model names (gpt-5,claude-sonnet,gpt-4o-mini)')
+@click.option('--models', default="openai/gpt-5-nano", help='Comma-separated model names with vendor prefix like openai/gpt-5-nano')
 @click.option('--question', '-q', multiple=True, help='Question to evaluate (can be used multiple times)')
 @click.option('--questions-file', type=click.Path(exists=True), help='JSON file with list of questions')
 @click.option('--retriever-k', default=4, help='Number of documents to retrieve for RAG')
@@ -94,7 +93,11 @@ def run(docs_path, tag, skip_index, chunk_size, chunk_overlap, recreate_index,
         )
 
         # Initialize embeddings and vectorstore
-        embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model="openai/text-embedding-3-small"
+        )
         vectorstore = QdrantVectorStore(
             client=client,
             collection_name=collection_name,
@@ -123,12 +126,11 @@ def run(docs_path, tag, skip_index, chunk_size, chunk_overlap, recreate_index,
     model_list = [m.strip() for m in models.split(',')]
     model_map = {}
     for model_name in model_list:
-        if model_name == "gpt-5-nano":
-            model_map[model_name] = ChatOpenAI(model="gpt-5")
-        elif model_name == "claude-sonnet":
-            model_map[model_name] = ChatAnthropic(model="claude-sonnet-4-20250514")
-        else:
-            click.echo(f"Warning: Unknown model '{model_name}', skipping...")
+        model_map[model_name] = ChatOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model=model_name
+        )
 
     if not model_map:
         click.echo("Error: No valid models specified", err=True)
@@ -152,7 +154,11 @@ def run(docs_path, tag, skip_index, chunk_size, chunk_overlap, recreate_index,
     if mode in ['both', 'rag']:
         click.echo(f"Connecting to Qdrant at {qdrant_url}...")
         client = QdrantClient(url=qdrant_url)
-        embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model="openai/text-embedding-3-small"
+        )
         vectorstore = QdrantVectorStore(
             client=client,
             collection_name=collection_name,
